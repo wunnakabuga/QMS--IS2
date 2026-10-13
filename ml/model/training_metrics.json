@@ -1,0 +1,19 @@
+{
+  "records": 1000,
+  "train_size": 800,
+  "test_size": 200,
+  "mae_minutes": 4.069,
+  "rmse_minutes": 5.952,
+  "r2": 0.8813,
+  "within_5_minutes_percent": 72.5,
+  "baseline_mae_minutes": 13.268,
+  "cv_mae_mean": 4.888,
+  "cv_mae_std": 0.185,
+  "feature_importance": {
+    "queue_length": 0.6488,
+    "arrival_rate": 0.1425,
+    "service_rate": 0.0618,
+    "avg_service_time": 0.062,
+    "time_of_day": 0.085
+  }
+}

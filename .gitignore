@@ -1,0 +1,9 @@
+ml/model/*.joblib
+ml/data/*.csv
+*.log
+
+logs/
+__pycache__/
+*.pyc
+.venv/
+.vscode/
