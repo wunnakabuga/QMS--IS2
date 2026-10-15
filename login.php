@@ -52,14 +52,5 @@ page_head('Staff sign in', 'login', ['narrow' => true]);
       console, administrators the dashboard.
     </p>
   </div>
-
-  <div class="panel">
-    <h2>Prototype accounts</h2>
-    <table>
-      <tr><th>Role</th><th>Email</th><th>Password</th></tr>
-      <tr><td>Administrator</td><td class="tiny">admin@hudumacentre.go.ke</td><td class="tiny">MyAdmin2026</td></tr>
-      <tr><td>Counter staff</td><td class="tiny">j.wanjiru@hudumacentre.go.ke</td><td class="tiny">MyStaff2026</td></tr>
-    </table>
-  </div>
 </div>
 <?php page_foot(); ?>
