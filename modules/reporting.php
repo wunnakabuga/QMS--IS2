@@ -66,6 +66,8 @@ function report_summary(array $f): array
             SUM(qe.status = "expired")                          AS no_shows,
             SUM(qe.status = "cancelled")                        AS cancelled,
             SUM(qe.delivery_channel = "sms")                    AS sms_tickets,
+            SUM(qe.served_via_overflow = 1
+                AND qe.status = "completed")                    AS overflow_served,
             AVG(CASE WHEN qe.status = "completed"
                       AND qe.service_start_time IS NOT NULL
                      THEN TIMESTAMPDIFF(SECOND, qe.join_time,
@@ -84,9 +86,15 @@ function report_summary(array $f): array
                    AND qe.service_start_time IS NOT NULL ';
 
     $acc = q_one(
+        // MAE and MSE are both computed on the live data, using the same
+        // definitions as ml/train_model.py, so the figures the system
+        // reports in service can be compared directly with the held-out
+        // test results from training.
         'SELECT COUNT(*) AS n,
                 AVG(ABS(qe.predicted_wait_time -
                         TIMESTAMPDIFF(SECOND, qe.join_time, qe.service_start_time)/60)) AS mae,
+                AVG(POW(qe.predicted_wait_time -
+                        TIMESTAMPDIFF(SECOND, qe.join_time, qe.service_start_time)/60, 2)) AS mse,
                 AVG(ABS(qe.predicted_wait_time -
                         TIMESTAMPDIFF(SECOND, qe.join_time, qe.service_start_time)/60) <= 5) * 100
                     AS within_5
@@ -103,6 +111,7 @@ function report_summary(array $f): array
         'no_shows'           => $noShows,
         'cancelled'          => (int)($row['cancelled'] ?? 0),
         'sms_tickets'        => (int)($row['sms_tickets'] ?? 0),
+        'overflow_served'    => (int)($row['overflow_served'] ?? 0),
         'no_show_rate'       => $total > 0 ? round($noShows / $total * 100, 1) : null,
         'avg_actual_wait'    => $row['avg_actual_wait'] !== null
                                   ? round((float)$row['avg_actual_wait'], 1) : null,
@@ -110,6 +119,10 @@ function report_summary(array $f): array
                                   ? round((float)$row['avg_predicted_wait'], 1) : null,
         'accuracy_n'         => (int)($acc['n'] ?? 0),
         'mae'                => $acc['mae'] !== null ? round((float)$acc['mae'], 2) : null,
+        'mse'                => ($acc['mse'] ?? null) !== null
+                                  ? round((float)$acc['mse'], 2) : null,
+        'rmse'               => ($acc['mse'] ?? null) !== null
+                                  ? round(sqrt((float)$acc['mse']), 2) : null,
         'within_5'           => $acc['within_5'] !== null
                                   ? round((float)$acc['within_5'], 1) : null,
     ];
@@ -183,6 +196,8 @@ function report_by_counter(array $f): array
                 COUNT(qe.queue_entry_id) AS entries,
                 SUM(qe.status = "completed") AS served,
                 SUM(qe.status = "expired")   AS no_shows,
+                SUM(qe.served_via_overflow = 1
+                    AND qe.status = "completed") AS overflow_served,
                 AVG(CASE WHEN qe.status = "completed"
                          THEN TIMESTAMPDIFF(SECOND, qe.service_start_time,
                                             qe.service_end_time)/60 END) AS avg_service
@@ -207,7 +222,7 @@ function report_entries(array $f, int $limit = 0, int $offset = 0): array
         'SELECT qe.queue_entry_id, qe.queue_number, qe.service_type, qe.status,
                 qe.join_time, qe.service_start_time, qe.service_end_time,
                 qe.predicted_wait_time, qe.prediction_source, qe.delivery_channel,
-                sc.counter_name,
+                qe.served_via_overflow, sc.counter_name,
                 TIMESTAMPDIFF(SECOND, qe.join_time, qe.service_start_time)/60
                     AS actual_wait,
                 TIMESTAMPDIFF(SECOND, qe.service_start_time, qe.service_end_time)/60

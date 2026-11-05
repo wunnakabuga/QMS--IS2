@@ -52,7 +52,7 @@ if (($_GET['export'] ?? '') === 'csv') {
         'Queue number', 'Service type', 'Counter', 'Status', 'Join time',
         'Service start', 'Service end', 'Predicted wait (min)',
         'Actual wait (min)', 'Variance (min)', 'Service duration (min)',
-        'Prediction source', 'Delivery channel',
+        'Prediction source', 'Delivery channel', 'Served via overflow',
     ]);
     foreach ($rows as $r) {
         $pred = $r['predicted_wait_time'] !== null ? (float)$r['predicted_wait_time'] : null;
@@ -68,6 +68,7 @@ if (($_GET['export'] ?? '') === 'csv') {
             $r['service_minutes'] !== null
                 ? number_format((float)$r['service_minutes'], 2, '.', '') : '',
             $r['prediction_source'] ?? '', $r['delivery_channel'],
+            (int)($r['served_via_overflow'] ?? 0) === 1 ? 'yes' : 'no',
         ]);
     }
     fclose($out);
@@ -108,6 +109,7 @@ page_head('Reports and analytics', 'reports', [
     <a href="dashboard.php">Dashboard</a>
     <a href="monitor.php">Live queue monitor</a>
     <a href="counters.php">Service counters</a>
+    <a href="balancing.php">Load balancing</a>
     <a class="on" href="reports.php">Reports &amp; analytics</a>
     <a href="model.php">Prediction model</a>
     <a href="notifications.php">Notifications log</a>
@@ -188,6 +190,32 @@ page_head('Reports and analytics', 'reports', [
               ? e((string)$summary['within_5']) . '% within 5 min &middot; n=' . $summary['accuracy_n']
               : 'no model predictions in range' ?></div></div>
     </div>
+
+    <div class="grid g4" style="margin-bottom:16px;">
+      <div class="stat"><div class="k">Prediction MSE</div>
+        <div class="v"><?= $summary['mse'] !== null
+              ? e((string)$summary['mse']) : '—' ?><small> min&sup2;</small></div>
+        <div class="d">penalises large misses</div></div>
+      <div class="stat"><div class="k">Prediction RMSE</div>
+        <div class="v"><?= $summary['rmse'] !== null
+              ? e((string)$summary['rmse']) : '—' ?><small> min</small></div>
+        <div class="d">&radic;MSE, back in minutes</div></div>
+      <div class="stat"><div class="k">Served by overflow</div>
+        <div class="v"><?= number_format($summary['overflow_served']) ?></div>
+        <div class="d">load balancing &mdash;
+          <a href="balancing.php">detail</a></div></div>
+      <div class="stat"><div class="k">SMS tickets</div>
+        <div class="v"><?= number_format($summary['sms_tickets']) ?></div>
+        <div class="d">of <?= number_format($summary['total_entries']) ?> issued</div></div>
+    </div>
+    <p class="tiny muted" style="margin-top:-6px; margin-bottom:18px;">
+      MAE, MSE and RMSE here are computed on live predictions using the same
+      definitions as <code>ml/train_model.py</code>, so they can be compared
+      directly against the held-out training figures on the
+      <a href="model.php">prediction model</a> page. A live MSE much larger
+      than the training MSE would indicate the model is meeting conditions the
+      training data did not represent.
+    </p>
 
     <div class="grid g2">
       <div class="panel">
@@ -271,7 +299,8 @@ page_head('Reports and analytics', 'reports', [
       <table>
         <thead><tr>
           <th>Counter</th><th>Staff</th><th>Service type</th><th>Entries</th>
-          <th>Served</th><th>No-shows</th><th>Avg service time</th>
+          <th>Served</th><th>Via overflow</th><th>No-shows</th>
+          <th>Avg service time</th>
         </tr></thead>
         <tbody>
         <?php foreach ($byCounter as $c): ?>
@@ -281,6 +310,7 @@ page_head('Reports and analytics', 'reports', [
             <td><?= e($c['service_type']) ?></td>
             <td><?= (int)$c['entries'] ?></td>
             <td><?= (int)$c['served'] ?></td>
+            <td><?= (int)($c['overflow_served'] ?? 0) ?: '—' ?></td>
             <td><?= (int)$c['no_shows'] ?></td>
             <td><?= $c['avg_service'] !== null
                     ? number_format((float)$c['avg_service'], 1) . ' min' : '—' ?></td>

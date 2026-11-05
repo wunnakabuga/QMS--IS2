@@ -4,6 +4,7 @@ define('QMS_ROOT', '../');
 require_once __DIR__ . '/../includes/layout.php';
 require_once __DIR__ . '/../modules/service_delivery.php';
 require_once __DIR__ . '/../modules/dispatch.php';
+require_once __DIR__ . '/../modules/load_balancing.php';
 
 $user = require_login();
 if ($user['role'] === 'admin' && isset($_GET['counter'])) {
@@ -31,6 +32,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check($_POST['csrf'] ?? null))
 
     switch ($action) {
         case 'call_next':  $result = call_next($counterId);        break;
+        case 'call_overflow':
+            $result = call_next_overflow($counterId,
+                                         (string)($_POST['service_type'] ?? ''));
+            if ($result['ok']) {
+                flash('Called a client from the '
+                      . $result['service_type'] . ' queue to this counter.',
+                      'success');
+            }
+            break;
         case 'start':      $result = start_service($entryId);      break;
         case 'complete':   $result = complete_service($entryId);   break;
         case 'no_show':    $result = mark_no_show($entryId);       break;
@@ -48,6 +58,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check($_POST['csrf'] ?? null))
     } elseif ($result['ok'] && $action === 'complete') {
         flash('Service completed in '
               . gmdate('i:s', (int)($result['duration_seconds'] ?? 0)) . '.', 'success');
+    } elseif ($result['ok'] && $action === 'call_next' && !empty($result['overflow'])) {
+        flash('Your own queue is empty, so the next client was taken from the '
+              . ($result['service_type'] ?? 'busiest') . ' queue.', 'info');
     }
     redirect('counter.php' . ($user['role'] === 'admin' ? '?counter=' . $counterId : ''));
 }
@@ -55,6 +68,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check($_POST['csrf'] ?? null))
 $current  = current_at_counter($counterId);
 $upcoming = upcoming_for_counter($counterId, 8);
 $stats    = counter_stats($counterId);
+
+// FR-22: congested queues this counter could help with, if it is idle.
+$overflow = $current ? [] : overflow_candidates($counterId);
 
 $elapsed = null;
 if ($current) {
@@ -124,6 +140,40 @@ page_head('Counter console', 'counter', [
       <?php elseif (!$upcoming): ?>
         <p class="tiny muted mt">There is nobody waiting for
           <?= e($counter['service_type']) ?> right now.</p>
+      <?php endif; ?>
+
+      <?php if ($overflow): ?>
+        <?php // FR-22: this counter is idle while another queue is congested. ?>
+        <div class="alert info mt" style="text-align:left;">
+          <b>This counter is free and another queue is backed up.</b>
+          <p class="tiny mt" style="margin-bottom:10px;">
+            You can take a client from one of these queues instead of waiting
+            for your own. Your own queue is served first whenever anyone is in it.
+          </p>
+          <?php foreach ($overflow as $cand): ?>
+            <form method="post" style="margin-bottom:8px;">
+              <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
+              <input type="hidden" name="service_type"
+                     value="<?= e($cand['service_type']) ?>">
+              <button class="btn block sm" name="action" value="call_overflow">
+                Call next from <?= e($cand['service_type']) ?>
+              </button>
+              <span class="tiny muted">
+                <?= (int)$cand['waiting'] ?> waiting
+                <?php if ($cand['unstaffed']): ?>
+                  &middot; <b>no counter open for this service</b>
+                <?php else: ?>
+                  across <?= (int)$cand['open_counters'] ?>
+                  counter<?= $cand['open_counters'] === 1 ? '' : 's' ?>
+                  (<?= e($cand['load_per_counter']) ?> each)
+                <?php endif; ?>
+                <?php if ($cand['longest_wait_minutes'] > 0): ?>
+                  &middot; longest wait <?= (int)$cand['longest_wait_minutes'] ?> min
+                <?php endif; ?>
+              </span>
+            </form>
+          <?php endforeach; ?>
+        </div>
       <?php endif; ?>
     <?php endif; ?>
 

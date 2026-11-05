@@ -149,7 +149,13 @@ def main():
 
     pred = model.predict(X_test)
     mae = mean_absolute_error(y_test, pred)
-    rmse = float(np.sqrt(mean_squared_error(y_test, pred)))
+    # MSE penalises a large error far more heavily than several small ones,
+    # because each error is squared before averaging. Reported alongside MAE
+    # so that occasional badly wrong predictions cannot hide behind a
+    # flattering average. RMSE is its square root, which returns the figure
+    # to minutes and so can be compared directly against MAE.
+    mse = float(mean_squared_error(y_test, pred))
+    rmse = float(np.sqrt(mse))
     r2 = r2_score(y_test, pred)
 
     # Cross-validated MAE on the training partition.
@@ -158,19 +164,29 @@ def main():
 
     # Baseline: predicting the mean. Shows the model is learning something.
     baseline = DummyRegressor(strategy="mean").fit(X_train, y_train)
-    base_mae = mean_absolute_error(y_test, baseline.predict(X_test))
+    base_pred = baseline.predict(X_test)
+    base_mae = mean_absolute_error(y_test, base_pred)
+    base_mse = float(mean_squared_error(y_test, base_pred))
+    base_rmse = float(np.sqrt(base_mse))
 
     # Accuracy expressed as the share of predictions within 5 minutes,
     # which is the tolerance used for the usability claim in Chapter 5.
     within_5 = float(np.mean(np.abs(pred - y_test) <= 5.0) * 100)
 
     print("\nHeld-out test performance")
-    print(f"  MAE                 {mae:6.2f} minutes")
-    print(f"  RMSE                {rmse:6.2f} minutes")
-    print(f"  R-squared           {r2:6.3f}")
-    print(f"  Within 5 minutes    {within_5:6.1f} %")
-    print(f"  Baseline (mean) MAE {base_mae:6.2f} minutes")
-    print(f"  5-fold CV MAE       {cv.mean():6.2f} (+/- {cv.std():.2f})")
+    print(f"  MAE                  {mae:7.2f} minutes")
+    print(f"  MSE                  {mse:7.2f} minutes squared")
+    print(f"  RMSE                 {rmse:7.2f} minutes")
+    print(f"  R-squared            {r2:7.3f}")
+    print(f"  Within 5 minutes     {within_5:7.1f} %")
+    print(f"  5-fold CV MAE        {cv.mean():7.2f} (+/- {cv.std():.2f})")
+    print("\nBaseline (always predicts the mean wait)")
+    print(f"  MAE                  {base_mae:7.2f} minutes"
+          f"   ({base_mae / mae:.1f}x worse)")
+    print(f"  MSE                  {base_mse:7.2f} minutes squared"
+          f"   ({base_mse / mse:.1f}x worse)")
+    print(f"  RMSE                 {base_rmse:7.2f} minutes"
+          f"   ({base_rmse / rmse:.1f}x worse)")
 
     print("\nFeature importance")
     for name, imp in sorted(zip(FEATURES, model.feature_importances_),
@@ -195,10 +211,13 @@ def main():
         "train_size": int(len(X_train)),
         "test_size": int(len(X_test)),
         "mae_minutes": round(float(mae), 3),
+        "mse_minutes_squared": round(mse, 3),
         "rmse_minutes": round(rmse, 3),
         "r2": round(float(r2), 4),
         "within_5_minutes_percent": round(within_5, 2),
         "baseline_mae_minutes": round(float(base_mae), 3),
+        "baseline_mse_minutes_squared": round(base_mse, 3),
+        "baseline_rmse_minutes": round(base_rmse, 3),
         "cv_mae_mean": round(float(cv.mean()), 3),
         "cv_mae_std": round(float(cv.std()), 3),
         "feature_importance": {

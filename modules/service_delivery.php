@@ -92,15 +92,36 @@ function call_next(int $counterId): array
     }
 
     // Checked-in clients are called ahead of clients who have not yet
-    // arrived, then in join order.
+    // arrived, then in join order. queue_entry_id breaks ties: join_time has
+    // one-second resolution, and on a busy morning several clients share a
+    // second, which would otherwise leave the call order to the database.
+    // Two clients who joined in the same second are then served in the order
+    // their tickets were issued, which is the order they can see.
     $next = q_one(
         'SELECT queue_entry_id FROM queue_entry
           WHERE service_type = :st AND status IN ("waiting","checked_in")
-          ORDER BY (status = "checked_in") DESC, join_time ASC
+          ORDER BY (status = "checked_in") DESC, join_time ASC,
+                   queue_entry_id ASC
           LIMIT 1',
         [':st' => $counter['service_type']]
     );
     if (!$next) {
+        // FR-22: nobody waits for this counter's own service. Where the
+        // administrator has enabled automatic load balancing, fall through
+        // to the most congested other queue rather than leaving the
+        // counter idle. Where it is not enabled, the console offers the
+        // same move to the clerk as an explicit choice.
+        require_once __DIR__ . '/load_balancing.php';
+        if (overflow_is_automatic()) {
+            $rec = overflow_recommendation($counterId);
+            if ($rec) {
+                $result = call_next_overflow($counterId, $rec['service_type']);
+                if ($result['ok']) {
+                    $result['overflow'] = true;
+                    return $result;
+                }
+            }
+        }
         return ['ok' => false, 'error' => 'There is nobody waiting.'];
     }
 

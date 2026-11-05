@@ -433,6 +433,248 @@ if ($fbEntry > 0) {
           'no completed entries');
 }
 
+// ------------------------------------------------ 5.0 Counter load balancing
+section('Process 5.0 — Counter Load Balancing (FR-21, FR-22)');
+
+require_once __DIR__ . '/../modules/load_balancing.php';
+
+// A clean slate, and rules we control rather than inherit.
+db()->exec('SET FOREIGN_KEY_CHECKS = 0');
+foreach (['notification', 'service_log', 'queue_entry'] as $t) {
+    db()->exec("TRUNCATE TABLE $t");
+}
+db()->exec('DELETE FROM user WHERE role = "client"');
+db()->exec('SET FOREIGN_KEY_CHECKS = 1');
+
+$savedRules = [
+    'overflow_enabled'     => setting_get('overflow_enabled', '1'),
+    'overflow_auto'        => setting_get('overflow_auto', '0'),
+    'overflow_threshold'   => setting_get('overflow_threshold', '3'),
+    'overflow_min_waiting' => setting_get('overflow_min_waiting', '2'),
+];
+setting_set_many([
+    'overflow_enabled'     => '1',
+    'overflow_auto'        => '0',
+    'overflow_threshold'   => '3',
+    'overflow_min_waiting' => '2',
+]);
+
+// Counter 4 serves Business Permit; counters 2 and 3 serve ID Registration.
+// Build a congested Business Permit queue and leave ID Registration empty,
+// so counter 2 is idle while counter 4 is swamped.
+$permitEntries = [];
+for ($i = 0; $i < 6; $i++) {
+    $j = join_queue('Permit Client ' . $i, '07220100' . sprintf('%02d', $i),
+                    null, 'Business Permit');
+    check('congested queue: client ' . ($i + 1) . ' joined Business Permit',
+          !empty($j['ok']), $j['error'] ?? '');
+    if (!empty($j['ok'])) {
+        $permitEntries[] = (int)$j['entry_id'];
+    }
+}
+
+$loads = service_load_snapshot();
+$permitLoad = null;
+$idLoad = null;
+foreach ($loads as $l) {
+    if ($l['service_type'] === 'Business Permit')  { $permitLoad = $l; }
+    if ($l['service_type'] === 'ID Registration')  { $idLoad = $l; }
+}
+
+check('load snapshot reports the Business Permit queue', $permitLoad !== null);
+check('Business Permit shows 6 waiting',
+      ($permitLoad['waiting'] ?? 0) === 6,
+      'got ' . ($permitLoad['waiting'] ?? 'null'));
+check('Business Permit load per counter is 6.0 across its 1 open counter',
+      abs((float)($permitLoad['load_per_counter'] ?? 0) - 6.0) < 0.01,
+      'got ' . ($permitLoad['load_per_counter'] ?? 'null'));
+check('Business Permit is flagged congested (6.0 >= threshold 3)',
+      !empty($permitLoad['congested']));
+check('ID Registration is not congested', empty($idLoad['congested'] ?? false));
+
+check('counter 2 (ID Registration, empty queue) is idle',
+      counter_is_idle(2));
+check('counter 4 (Business Permit, 6 waiting) is not idle',
+      !counter_is_idle(4));
+
+$cands = overflow_candidates(2);
+check('idle counter 2 is offered the Business Permit queue',
+      count($cands) > 0
+      && $cands[0]['service_type'] === 'Business Permit',
+      'got ' . ($cands[0]['service_type'] ?? 'none'));
+check('busy counter 4 is offered nothing', overflow_candidates(4) === []);
+
+// The core rule: spare capacity moves, scarcity does not.
+// Same ordering the module uses, tiebreak included, so this asserts the
+// documented FIFO rule rather than whatever order the database happens to
+// return for clients who joined within the same second.
+$firstPermit = q_val('SELECT queue_number FROM queue_entry
+                       WHERE service_type = "Business Permit"
+                         AND status IN ("waiting","checked_in")
+                       ORDER BY (status = "checked_in") DESC, join_time ASC,
+                                queue_entry_id ASC
+                       LIMIT 1');
+$ov = call_next_overflow(2, 'Business Permit');
+check('counter 2 calls a Business Permit client', !empty($ov['ok']),
+      $ov['error'] ?? '');
+
+if (!empty($ov['ok'])) {
+    $called = q_one('SELECT queue_number, counter_id, status, served_via_overflow
+                       FROM queue_entry WHERE queue_entry_id = :id',
+                    [':id' => $ov['entry_id']]);
+    check('the longest-waiting client was taken, not an arbitrary one',
+          $called['queue_number'] === $firstPermit,
+          "expected $firstPermit, got " . $called['queue_number']);
+    check('the client is now at counter 2', (int)$called['counter_id'] === 2);
+    check('the client status is called', $called['status'] === 'called');
+    check('served_via_overflow is flagged on the entry',
+          (int)$called['served_via_overflow'] === 1);
+    check('the overflow call is written to the service log',
+          (int)q_val('SELECT COUNT(*) FROM service_log
+                       WHERE queue_entry_id = :id AND status = "called_overflow"',
+                     [':id' => $ov['entry_id']], 0) === 1);
+}
+
+// Guard: a counter holding a client cannot take another.
+$blocked = call_next_overflow(2, 'Business Permit');
+check('a counter already serving someone is refused',
+      empty($blocked['ok']), 'it was allowed');
+
+// Guard: own queue first. Give ID Registration a client and counter 3 must
+// then be refused overflow even though Business Permit is still congested.
+$ownClient = join_queue('Own Queue Client', '0722099999', null, 'ID Registration');
+check('a client joins the ID Registration queue', !empty($ownClient['ok']));
+check('counter 3 is no longer idle once its own queue has someone',
+      !counter_is_idle(3));
+$ownFirst = call_next_overflow(3, 'Business Permit');
+check('overflow is refused while the counter\'s own queue has clients',
+      empty($ownFirst['ok']), 'it was allowed');
+check('the refusal explains that the own queue comes first',
+      str_contains(strtolower($ownFirst['error'] ?? ''), 'own'),
+      $ownFirst['error'] ?? '');
+
+// Guard: a counter cannot use overflow for its own service type.
+$sameType = call_next_overflow(4, 'Business Permit');
+check('a counter cannot take overflow of its own service type',
+      empty($sameType['ok']), 'it was allowed');
+
+// Guard: per-counter opt out is respected.
+q('UPDATE service_counter SET overflow_enabled = 0 WHERE counter_id = 3');
+q('UPDATE queue_entry SET status = "completed", service_end_time = NOW()
+    WHERE service_type = "ID Registration" AND status IN ("waiting","checked_in")');
+check('counter 3 is idle again once its queue is cleared', counter_is_idle(3));
+check('a counter with overflow_enabled = 0 is offered nothing',
+      overflow_candidates(3) === []);
+$optedOut = call_next_overflow(3, 'Business Permit');
+check('a counter with overflow_enabled = 0 is refused', empty($optedOut['ok']));
+q('UPDATE service_counter SET overflow_enabled = 1 WHERE counter_id = 3');
+
+// Guard: the master switch.
+setting_set('overflow_enabled', '0');
+check('nothing is offered while load balancing is switched off',
+      overflow_candidates(3) === []);
+$offResult = call_next_overflow(3, 'Business Permit');
+check('overflow is refused while load balancing is switched off',
+      empty($offResult['ok']));
+setting_set('overflow_enabled', '1');
+
+// Guard: the threshold is honoured. At a threshold of 20, a queue of 5
+// across 1 counter is no longer congested enough to justify moving staff.
+setting_set('overflow_threshold', '20');
+check('a queue below the threshold is not treated as congested',
+      overflow_candidates(3) === []);
+setting_set('overflow_threshold', '3');
+check('the queue is congested again once the threshold is restored',
+      count(overflow_candidates(3)) > 0);
+
+// Automatic mode: call_next falls through on its own.
+setting_set('overflow_auto', '1');
+$auto = call_next(3);
+check('automatic mode: call_next falls through to the congested queue',
+      !empty($auto['ok']) && !empty($auto['overflow']),
+      $auto['error'] ?? 'no overflow flag');
+if (!empty($auto['ok'])) {
+    check('the automatically called client is flagged as overflow',
+          (int)q_val('SELECT served_via_overflow FROM queue_entry
+                       WHERE queue_entry_id = :id',
+                     [':id' => $auto['entry_id']], 0) === 1);
+    check('the automatically called client sits at counter 3',
+          (int)q_val('SELECT counter_id FROM queue_entry
+                       WHERE queue_entry_id = :id',
+                     [':id' => $auto['entry_id']], 0) === 3);
+}
+setting_set('overflow_auto', '0');
+
+// Efficiency reporting. Complete the two overflow services so there is
+// something to measure.
+foreach (q_all('SELECT queue_entry_id FROM queue_entry
+                 WHERE served_via_overflow = 1
+                   AND status IN ("called","in_service")') as $row) {
+    start_service((int)$row['queue_entry_id']);
+    complete_service((int)$row['queue_entry_id']);
+}
+
+$ostats = overflow_stats();
+check('overflow statistics count the completed overflow services',
+      $ostats['served_by_overflow'] >= 2,
+      'got ' . $ostats['served_by_overflow']);
+check('overflow share of completions is a sane percentage',
+      $ostats['share_percent'] > 0 && $ostats['share_percent'] <= 100,
+      'got ' . $ostats['share_percent']);
+check('recovered counter minutes is not negative',
+      $ostats['minutes_recovered'] >= 0);
+check('per-service-type breakdown names Business Permit',
+      !empty(array_filter($ostats['by_service_type'],
+             fn($r) => $r['service_type'] === 'Business Permit')));
+
+$rsum = report_summary(report_filters([]));
+check('the report summary carries the overflow count',
+      ($rsum['overflow_served'] ?? 0) >= 2,
+      'got ' . ($rsum['overflow_served'] ?? 'missing'));
+check('the report summary carries a live MSE',
+      array_key_exists('mse', $rsum));
+check('the report summary carries a live RMSE',
+      array_key_exists('rmse', $rsum));
+if ($rsum['mse'] !== null && $rsum['mae'] !== null) {
+    check('live RMSE is the square root of live MSE',
+          abs($rsum['rmse'] - sqrt($rsum['mse'])) < 0.01,
+          "mse {$rsum['mse']}, rmse {$rsum['rmse']}");
+}
+
+// An unstaffed queue is the worst case and must outrank a merely busy one.
+// It arises the way it does in a real centre: clients join while the counter
+// is open, and the counter then closes with people still in the queue.
+// Registration itself refuses to issue a ticket for a service with no open
+// counter, so this state cannot be created from the join form.
+q('UPDATE service_counter SET status = "open" WHERE counter_id = 5');
+$lic  = join_queue('Licence Client A', '0722088801', null, 'Licence Renewal');
+$lic2 = join_queue('Licence Client B', '0722088802', null, 'Licence Renewal');
+check('clients join Licence Renewal while its counter is open',
+      !empty($lic['ok']) && !empty($lic2['ok']),
+      ($lic['error'] ?? '') . ' ' . ($lic2['error'] ?? ''));
+q('UPDATE service_counter SET status = "closed" WHERE counter_id = 5');
+check('registration refuses a new ticket once the last counter closes',
+      empty(join_queue('Licence Client C', '0722088803',
+                       null, 'Licence Renewal')['ok']));
+$snapshot = service_load_snapshot();
+check('an unstaffed queue is reported first in the load snapshot',
+      !empty($snapshot) && !empty($snapshot[0]['unstaffed']),
+      'first row: ' . ($snapshot[0]['service_type'] ?? 'none'));
+check('an unstaffed queue reports a null load rather than dividing by zero',
+      $snapshot[0]['load_per_counter'] === null);
+$unstaffedCands = overflow_candidates(2);
+check('an idle counter is offered the unstaffed queue',
+      !empty(array_filter($unstaffedCands,
+             fn($c) => $c['service_type'] === 'Licence Renewal')),
+      'offered: ' . implode(', ', array_column($unstaffedCands, 'service_type')));
+q('UPDATE service_counter SET status = "open" WHERE counter_id = 4');
+
+// Restore whatever the rules were before the test ran.
+setting_set_many($savedRules);
+check('load balancing rules are restored after the test',
+      (string)setting_get('overflow_threshold', '3')
+        === (string)$savedRules['overflow_threshold']);
+
 // --------------------------------------------------------------- summary
 section('Summary');
 printf("  %d passed, %d failed\n", $pass, $fail);

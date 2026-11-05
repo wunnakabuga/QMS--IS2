@@ -27,6 +27,10 @@ CREATE TABLE service_counter (
     counter_name      VARCHAR(60)  NOT NULL,
     service_type      VARCHAR(80)  NOT NULL,
     status            ENUM('open','closed') NOT NULL DEFAULT 'closed',
+    -- Whether this counter may take overflow from a congested service type
+    -- when its own queue is empty (FR-22). Cleared for counters tied to
+    -- equipment that only serves their own service.
+    overflow_enabled  TINYINT(1) NOT NULL DEFAULT 1,
     assigned_staff_id INT DEFAULT NULL,
     CONSTRAINT fk_counter_staff FOREIGN KEY (assigned_staff_id)
         REFERENCES user (user_id) ON DELETE SET NULL,
@@ -52,6 +56,10 @@ CREATE TABLE queue_entry (
     expiry_time         DATETIME DEFAULT NULL,
     predicted_wait_time DECIMAL(6,2) DEFAULT NULL,
     prediction_source   ENUM('model','fallback') DEFAULT NULL,
+    -- Set when this client was called to a counter allocated to a different
+    -- service type, under the load balancing rule (FR-22). Recorded rather
+    -- than derived, because a counter may be reallocated afterwards.
+    served_via_overflow TINYINT(1) NOT NULL DEFAULT 0,
     delivery_channel    ENUM('e-ticket','sms') NOT NULL DEFAULT 'e-ticket',
     CONSTRAINT fk_entry_user FOREIGN KEY (user_id)
         REFERENCES user (user_id) ON DELETE CASCADE,

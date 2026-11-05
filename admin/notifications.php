@@ -63,6 +63,7 @@ page_head('Notifications log', 'notifications', [
     <a href="dashboard.php">Dashboard</a>
     <a href="monitor.php">Live queue monitor</a>
     <a href="counters.php">Service counters</a>
+    <a href="balancing.php">Load balancing</a>
     <a href="reports.php">Reports &amp; analytics</a>
     <a href="model.php">Prediction model</a>
     <a class="on" href="notifications.php">Notifications log</a>

@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check($_POST['csrf'] ?? null))
         $staff   = $_POST['assigned_staff_id'] ?? '';
         $status  = ($_POST['status'] ?? 'closed') === 'open' ? 'open' : 'closed';
         $staffId = $staff !== '' ? (int)$staff : null;
+        $overflowOk = isset($_POST['overflow_enabled']) ? 1 : 0;
 
         if ($name === '' || !in_array($service, $SERVICE_TYPES, true)) {
             flash('Enter a counter name and choose a service type.', 'error');
@@ -23,16 +24,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check($_POST['csrf'] ?? null))
             if ($counterId > 0) {
                 q('UPDATE service_counter
                       SET counter_name = :n, service_type = :st,
-                          status = :s, assigned_staff_id = :a
+                          status = :s, assigned_staff_id = :a,
+                          overflow_enabled = :ov
                     WHERE counter_id = :c',
                   [':n' => $name, ':st' => $service, ':s' => $status,
-                   ':a' => $staffId, ':c' => $counterId]);
+                   ':a' => $staffId, ':ov' => $overflowOk, ':c' => $counterId]);
                 flash('Counter updated.', 'success');
             } else {
                 q('INSERT INTO service_counter
-                      (counter_name, service_type, status, assigned_staff_id)
-                   VALUES (:n, :st, :s, :a)',
-                  [':n' => $name, ':st' => $service, ':s' => $status, ':a' => $staffId]);
+                      (counter_name, service_type, status, assigned_staff_id,
+                       overflow_enabled)
+                   VALUES (:n, :st, :s, :a, :ov)',
+                  [':n' => $name, ':st' => $service, ':s' => $status,
+                   ':a' => $staffId, ':ov' => $overflowOk]);
                 flash('Counter created.', 'success');
             }
             recalculate_predictions($service);
@@ -85,6 +89,7 @@ page_head('Service counters', 'counters', [
     <a href="dashboard.php">Dashboard</a>
     <a href="monitor.php">Live queue monitor</a>
     <a class="on" href="counters.php">Service counters</a>
+    <a href="balancing.php">Load balancing</a>
     <a href="reports.php">Reports &amp; analytics</a>
     <a href="model.php">Prediction model</a>
     <a href="notifications.php">Notifications log</a>
@@ -107,7 +112,7 @@ page_head('Service counters', 'counters', [
       <table>
         <thead><tr>
           <th>ID</th><th>Counter name</th><th>Service type</th><th>Assigned staff</th>
-          <th>Queue</th><th>Status</th><th>Actions</th>
+          <th>Queue</th><th>Overflow</th><th>Status</th><th>Actions</th>
         </tr></thead>
         <tbody>
         <?php foreach ($counters as $c): ?>
@@ -117,6 +122,11 @@ page_head('Service counters', 'counters', [
             <td><?= e($c['service_type']) ?></td>
             <td><?= e($c['staff_name'] ?? '—') ?></td>
             <td><?= (int)$c['load_count'] ?></td>
+            <td class="tiny">
+              <?= (int)($c['overflow_enabled'] ?? 1) === 1
+                    ? 'allowed'
+                    : '<span class="muted">own service only</span>' ?>
+            </td>
             <td><?= badge($c['status']) ?></td>
             <td>
               <div style="display:flex; gap:6px;">
@@ -179,6 +189,24 @@ page_head('Service counters', 'counters', [
               <option value="closed" <?= ($editing['status'] ?? 'closed') === 'closed' ? 'selected' : '' ?>>Closed</option>
             </select>
           </div>
+        </div>
+        <div class="mt">
+          <label style="display:flex; align-items:flex-start; gap:9px;
+                        font-weight:400; cursor:pointer;">
+            <input type="checkbox" name="overflow_enabled" value="1"
+                   style="margin-top:3px;"
+                   <?= (int)($editing['overflow_enabled'] ?? 1) === 1 ? 'checked' : '' ?>>
+            <span>
+              <b>May take overflow from other queues</b>
+              <span class="tiny muted" style="display:block;">
+                When this counter has nobody waiting for
+                <?= e($editing['service_type'] ?? 'its own service') ?>, it can
+                serve a client from a congested queue instead of sitting idle.
+                Clear this for a counter tied to equipment that only handles
+                its own service.
+              </span>
+            </span>
+          </label>
         </div>
         <div class="btn-row">
           <button class="btn" name="action" value="save">Save counter</button>

@@ -93,6 +93,7 @@ page_head('Prediction model', 'model', [
     <a href="dashboard.php">Dashboard</a>
     <a href="monitor.php">Live queue monitor</a>
     <a href="counters.php">Service counters</a>
+    <a href="balancing.php">Load balancing</a>
     <a href="reports.php">Reports &amp; analytics</a>
     <a class="on" href="model.php">Prediction model</a>
     <a href="notifications.php">Notifications log</a>
@@ -171,6 +172,88 @@ page_head('Prediction model', 'model', [
             <div class="v"><?= e($metrics['within_5_minutes_percent']) ?><small>%</small></div>
             <div class="d">baseline MAE <?= e($metrics['baseline_mae_minutes']) ?> min</div></div>
         </div>
+
+        <h2 style="margin-top:22px;">Error metrics against the baseline</h2>
+        <?php
+          // The baseline predicts the mean wait for every client, ignoring
+          // every input. It is the weakest defensible comparator, and the
+          // ratio against it is what shows the model is learning.
+          $cmp = [
+            ['MAE',  'Mean absolute error',
+             $metrics['mae_minutes']  ?? null,
+             $metrics['baseline_mae_minutes'] ?? null, 'minutes'],
+            ['MSE',  'Mean squared error',
+             $metrics['mse_minutes_squared'] ?? null,
+             $metrics['baseline_mse_minutes_squared'] ?? null, 'minutes&sup2;'],
+            ['RMSE', 'Root mean squared error',
+             $metrics['rmse_minutes'] ?? null,
+             $metrics['baseline_rmse_minutes'] ?? null, 'minutes'],
+          ];
+        ?>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:70px;">Metric</th>
+              <th>Meaning</th>
+              <th class="right">Model</th>
+              <th class="right">Baseline</th>
+              <th class="right">Improvement</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($cmp as [$abbr, $meaning, $model, $base, $unit]): ?>
+              <tr>
+                <td><b><?= e($abbr) ?></b></td>
+                <td class="tiny muted"><?= e($meaning) ?></td>
+                <td class="right">
+                  <?= $model === null ? '&mdash;' : e($model) ?>
+                  <span class="tiny muted"><?= $unit ?></span>
+                </td>
+                <td class="right">
+                  <?= $base === null ? '&mdash;' : e($base) ?>
+                </td>
+                <td class="right">
+                  <?php if ($model !== null && $base !== null && (float)$model > 0): ?>
+                    <b><?= number_format((float)$base / (float)$model, 1) ?>&times;</b>
+                    <span class="tiny muted">better</span>
+                  <?php else: ?>
+                    &mdash;
+                  <?php endif; ?>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+            <tr>
+              <td><b>R&sup2;</b></td>
+              <td class="tiny muted">Share of variation explained</td>
+              <td class="right"><?= e($metrics['r2']) ?></td>
+              <td class="right">0.00</td>
+              <td class="right tiny muted">0 = explains nothing</td>
+            </tr>
+            <tr>
+              <td><b>CV</b></td>
+              <td class="tiny muted">5-fold cross-validated MAE</td>
+              <td class="right"><?= e($metrics['cv_mae_mean']) ?>
+                <span class="tiny muted">minutes</span></td>
+              <td class="right">&mdash;</td>
+              <td class="right tiny muted">
+                sd <?= e($metrics['cv_mae_std']) ?> &mdash; stable across folds
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="tiny muted mt">
+          MAE and MSE answer different questions. MAE is the average size of
+          an error in minutes, so it is the figure to quote to a citizen. MSE
+          squares each error before averaging, so one badly wrong prediction
+          costs far more than several slightly wrong ones &mdash; it is the
+          figure that exposes unreliability. The model's advantage over the
+          baseline is wider on MSE than on MAE, which says the baseline's
+          worst misses are much worse than the model's.
+          <?php if (!isset($metrics['mse_minutes_squared'])): ?>
+            <br><b>MSE is not in this metrics file.</b> Re-run
+            <code>python ml/train_model.py</code> to regenerate it.
+          <?php endif; ?>
+        </p>
 
         <h2 style="margin-top:22px;">Feature importance</h2>
         <?php

@@ -93,6 +93,23 @@ step('queue_entry.prediction_source',
         ADD COLUMN prediction_source ENUM("model","fallback") DEFAULT NULL
         AFTER predicted_wait_time');
 
+// --------------------------------------------------- counter load balancing
+step('service_counter.overflow_enabled',
+     fn() => !column_exists('service_counter', 'overflow_enabled'),
+     'ALTER TABLE service_counter
+        ADD COLUMN overflow_enabled TINYINT(1) NOT NULL DEFAULT 1 AFTER status');
+
+step('queue_entry.served_via_overflow',
+     fn() => !column_exists('queue_entry', 'served_via_overflow'),
+     'ALTER TABLE queue_entry
+        ADD COLUMN served_via_overflow TINYINT(1) NOT NULL DEFAULT 0
+        AFTER prediction_source');
+
+step('index on queue_entry.served_via_overflow',
+     fn() => !index_exists('queue_entry', 'idx_entry_overflow'),
+     'ALTER TABLE queue_entry
+        ADD INDEX idx_entry_overflow (served_via_overflow, status)');
+
 // -------------------------------------------------------- support tables
 step('app_setting table',
      fn() => !table_exists('app_setting'),
