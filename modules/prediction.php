@@ -92,16 +92,10 @@ function model_predict(array $rows): ?array
         1 => ['pipe', 'w'],
         2 => ['pipe', 'w'],
     ];
-    // escapeshellarg is used for the interpreter as well as the script,
-    // because on Windows both may contain spaces and backslashes
-    // (for example C:\Users\Name\AppData\Local\Programs\Python\python.exe).
-    $cmd = escapeshellarg(PYTHON_BIN) . ' ' . escapeshellarg(PREDICT_SCRIPT);
-    if (PHP_OS_FAMILY === 'Windows') {
-        // cmd.exe strips the outer quotes from a quoted command unless the
-        // whole string is wrapped again.
-        $cmd = '"' . $cmd . '"';
-    }
-    $proc = @proc_open($cmd, $descriptors, $pipes);
+         // Pass the command as an array so PHP launches the interpreter directly
+    // rather than through cmd.exe. With no shell involved there are no quote
+    // stripping rules to satisfy, which removes the problem at its source.
+    $proc = @proc_open([PYTHON_BIN, PREDICT_SCRIPT], $descriptors, $pipes);
     if (!is_resource($proc)) {
         return null;
     }
