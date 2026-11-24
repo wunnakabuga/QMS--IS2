@@ -40,8 +40,9 @@ db()->exec('SET FOREIGN_KEY_CHECKS = 1');
 
 // Open every counter so all services are available.
 db()->exec('UPDATE service_counter SET status = "open"');
-db()->exec('UPDATE service_counter SET assigned_staff_id = 2 WHERE counter_id = 4
-            AND assigned_staff_id IS NULL');
+db()->exec('UPDATE service_counter SET assigned_staff_id =
+            (SELECT user_id FROM user WHERE role = "staff" ORDER BY user_id LIMIT 1)
+            WHERE counter_id = 4 AND assigned_staff_id IS NULL');
 
 // ------------------------------------------------- historical completions
 echo "Creating historical service records...\n";
