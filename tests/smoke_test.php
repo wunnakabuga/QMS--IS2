@@ -323,12 +323,12 @@ check('wrong password is rejected', !password_verify('Password124', $hash));
 check('hash is not the plain text', $hash !== 'Password123'
       && str_starts_with($hash, '$2y$'));
 
-$staffLogin = auth_attempt('b.chebet@hudumacentre.go.ke', 'Password123');
+$staffLogin = auth_attempt('j.wanjiru@hudumacentre.go.ke', 'MyStaff2026');
 check('FR-20 staff sign in succeeds', $staffLogin !== null);
 check('FR-20 role is carried on the session',
       ($staffLogin['role'] ?? '') === 'staff', $staffLogin['role'] ?? 'none');
 check('FR-20 wrong password is refused',
-      auth_attempt('b.chebet@hudumacentre.go.ke', 'wrong') === null);
+      auth_attempt('j.wanjiru@hudumacentre.go.ke', 'wrong') === null);
 check('FR-20 a client cannot sign in',
       auth_attempt('mary@example.com', 'Password123') === null);
 
@@ -425,7 +425,7 @@ if ($fbEntry > 0) {
           (int)($fb['wait_accurate'] ?? -1) === 1);
 
     $avg = q_val('SELECT AVG(rating) FROM feedback');
-    check('mean satisfaction is computable for Chapter 5', $avg !== null);
+    check('mean satisfaction is computable', $avg !== null);
 
     q('DELETE FROM feedback WHERE queue_entry_id = :id', [':id' => $fbEntry]);
 } else {
