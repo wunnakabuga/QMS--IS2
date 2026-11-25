@@ -138,7 +138,8 @@ page_head('Your ticket', 'join');
   <div>
     <div class="panel">
       <h2>Live status</h2>
-      <div class="stat" style="margin-bottom:14px;">
+      <div class="stat" style="margin-bottom:14px;"
+           role="status" aria-live="polite" aria-atomic="true">
         <div class="k">Now serving</div>
         <div class="v" data-live="now"><?= $nowServing ? e($nowServing['queue_number']) : '&mdash;' ?></div>
         <div class="d" data-live="now-counter">
@@ -148,7 +149,7 @@ page_head('Your ticket', 'join');
       </div>
       <label>Progress to your turn</label>
       <div class="progress"><i data-live="progress" style="width:<?= $progress ?>%"></i></div>
-      <p class="tiny muted mt" data-live="stamp">This page refreshes automatically.</p>
+      <p class="tiny muted mt" data-live="stamp" aria-live="polite">This page refreshes automatically.</p>
     </div>
 
     <?php if (!$isOpen && $entry['status'] === 'completed'): ?>

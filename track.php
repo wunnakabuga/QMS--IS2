@@ -49,7 +49,8 @@ page_head('Track ticket', 'track');
 <?php endif; ?>
 
 <?php if ($entry): ?>
-  <div class="grid g4" style="margin-bottom:18px;">
+  <div class="grid g4" style="margin-bottom:18px;"
+       role="region" aria-label="Your ticket status">
     <div class="stat"><div class="k">Your ticket</div>
       <div class="v"><?= e($entry['queue_number']) ?></div></div>
     <div class="stat"><div class="k">Position</div>
