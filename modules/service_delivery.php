@@ -36,6 +36,9 @@ function staff_counter(int $staffUserId): ?array
  */
 function expire_lapsed_tickets(): int
 {
+    // End of day first: nothing from a previous day stays in the queue.
+    $stale = expire_stale_tickets();
+
     $lapsed = q_all(
         'SELECT queue_entry_id, service_type FROM queue_entry
           WHERE status = "called"
@@ -51,7 +54,40 @@ function expire_lapsed_tickets(): int
             WHERE queue_entry_id = :id', [':id' => $row['queue_entry_id']]);
         recalculate_predictions($row['service_type']);
     }
-    return count($lapsed);
+    return $stale + count($lapsed);
+}
+
+/**
+ * END-OF-DAY CLEAR-OUT. Expires every ticket still open (waiting, checked in,
+ * called or in service) from a previous day. The centre closes at
+ * CLOSING_HOUR, so these clients have gone home. Without this they would be
+ * called first the next morning and recorded as having waited all night,
+ * which wrecks the waiting-time and prediction-accuracy figures.
+ * Runs from the scheduled task (tasks/run_maintenance.php) and on page
+ * loads, via expire_lapsed_tickets().
+ * FIND: end of day, stale tickets, previous day tickets, clear queue
+ */
+function expire_stale_tickets(): int
+{
+    $stale = q_all(
+        'SELECT queue_entry_id, service_type FROM queue_entry
+          WHERE status IN ("waiting","checked_in","called","in_service")
+            AND queue_date < CURDATE()'
+    );
+    if (!$stale) {
+        return 0;
+    }
+    foreach ($stale as $row) {
+        q('UPDATE queue_entry SET status = "expired", expiry_time = NOW()
+            WHERE queue_entry_id = :id', [':id' => $row['queue_entry_id']]);
+        q('INSERT INTO service_log (queue_entry_id, counter_id, status)
+           SELECT queue_entry_id, counter_id, "expired" FROM queue_entry
+            WHERE queue_entry_id = :id', [':id' => $row['queue_entry_id']]);
+    }
+    foreach (array_unique(array_column($stale, 'service_type')) as $service) {
+        recalculate_predictions($service);
+    }
+    return count($stale);
 }
 
 /** The client currently being served or called at a counter, if any. */

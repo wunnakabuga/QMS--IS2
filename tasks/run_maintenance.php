@@ -45,7 +45,9 @@ function out(string $line, bool $quiet): void
 }
 
 try {
-    // 1. Expire tickets whose grace period has lapsed (FR-12).
+    // 1. Expire tickets whose grace period has lapsed (FR-12), and clear out
+    //    any ticket left open from a previous day (end-of-day clear-out).
+    //    FIND: end of day
     $expired = expire_lapsed_tickets();
 
     // 2. Dispatch reminders for clients whose turn is approaching (FR-10).
