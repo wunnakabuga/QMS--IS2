@@ -16,12 +16,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'service' => $_POST['service']    ?? '',
         'sms'     => !empty($_POST['sms_only']),
     ];
-    // Rate limit: at most 5 ticket attempts from one address in 10 minutes,
-    // and 3 attempts against one phone number in the same window.
-    $ipLimit = rate_limit_hit('join:ip:' . client_ip(), 5, 600);
-    $phoneKey = 'join:phone:' . normalise_phone(trim($old['phone']));
+    // Rate limit (anti-spam): at most 30 tickets from one network address and
+    // 6 per phone number in 10 minutes. Only tickets actually issued count -
+    // a failed attempt (typo, validation error) does not use up the allowance.
+    // The address limit is generous because everyone on the centre's Wi-Fi
+    // (or a shared kiosk) appears as one address.
+    // FIND: rate limiting, spam protection
+    $ipKey      = 'join:ip:' . client_ip();
+    $phoneKey   = 'join:phone:' . normalise_phone(trim($old['phone']));
+    $ipLimit    = rate_limit_check($ipKey, 30, 600);
     $phoneLimit = $old['phone'] !== ''
-        ? rate_limit_hit($phoneKey, 3, 600)
+        ? rate_limit_check($phoneKey, 6, 600)
         : ['allowed' => true, 'retry_after' => 0];
 
     if (!csrf_check($_POST['csrf'] ?? null)) {
@@ -36,6 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $old['sms'] ? 'sms' : 'e-ticket'
         );
         if ($result['ok']) {
+            rate_limit_record($ipKey);
+            rate_limit_record($phoneKey);
             // Email the e-ticket when an address was given (no-op unless SMTP
             // is configured; never blocks the client from joining).
             if (trim($old['email']) !== '') {

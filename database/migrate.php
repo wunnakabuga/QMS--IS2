@@ -162,6 +162,34 @@ step('composite index on queue_entry',
      'ALTER TABLE queue_entry
         ADD INDEX idx_entry_service_status_join (service_type, status, join_time)');
 
+// --------------------------------------------- daily ticket numbering
+// Ticket numbers restart at A-001 every day, so a number must be unique per
+// day, not forever. queue_date is filled in by MySQL from join_time.
+// FIND: duplicate ticket number, daily numbering, uq_queue_number
+step('queue numbers unique per day (queue_date)',
+     fn() => !column_exists('queue_entry', 'queue_date'),
+     'ALTER TABLE queue_entry
+        ADD COLUMN queue_date DATE AS (DATE(join_time)) STORED AFTER join_time,
+        DROP INDEX uq_queue_number,
+        ADD UNIQUE KEY uq_queue_number_day (queue_date, queue_number),
+        ADD INDEX idx_entry_number (queue_number)');
+
+// ------------------------------------- email unique for staff accounts only
+// Sign-in needs each staff/admin email to be unique. Clients do not sign in,
+// so a client may share an email with a staff account (a staff member
+// queueing for a service) or with another client (a family email).
+// staff_email is filled in by MySQL: the email for staff/admin, else NULL,
+// and a UNIQUE key ignores NULLs.
+// FIND: duplicate email, uq_user_email, staff email unique
+step('email unique among staff/admin only (staff_email)',
+     fn() => !column_exists('user', 'staff_email'),
+     'ALTER TABLE user
+        ADD COLUMN staff_email VARCHAR(120)
+            AS (IF(role IN ("staff","admin"), email, NULL)) STORED AFTER email,
+        DROP INDEX uq_user_email,
+        ADD UNIQUE KEY uq_staff_email (staff_email),
+        ADD INDEX idx_user_email (email)');
+
 // ------------------------------------------------------------- results
 foreach ($applied as $label) {
     echo "  applied  $label\n";

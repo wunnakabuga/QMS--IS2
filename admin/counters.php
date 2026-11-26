@@ -25,8 +25,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check($_POST['csrf'] ?? null))
         $staffId = $staff !== '' ? (int)$staff : null;
         $overflowOk = isset($_POST['overflow_enabled']) ? 1 : 0;
 
+        // ONE STAFF MEMBER PER COUNTER: refuse to assign someone who is
+        // already assigned to a different counter.
+        // FIND: one staff per counter, assign staff
+        $clash = $staffId !== null
+            ? q_one('SELECT counter_name FROM service_counter
+                      WHERE assigned_staff_id = :s AND counter_id <> :c',
+                    [':s' => $staffId, ':c' => $counterId])
+            : null;
+
         if ($name === '' || !in_array($service, $SERVICE_TYPES, true)) {
             flash('Enter a counter name and choose a service type.', 'error');
+        } elseif ($clash) {
+            flash('That staff member is already assigned to ' . $clash['counter_name']
+                  . '. Unassign them there first.', 'error');
+        } elseif ($status === 'open' && $staffId === null) {
+            flash('An open counter needs a staff member. Assign one, or set it to Closed.', 'error');
         } else {
             if ($counterId > 0) {
                 q('UPDATE service_counter
@@ -51,7 +65,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check($_POST['csrf'] ?? null))
     } elseif ($action === 'toggle' && $counterId > 0) {
         $counter = q_one('SELECT * FROM service_counter WHERE counter_id = :c',
                          [':c' => $counterId]);
-        if ($counter) {
+        if ($counter && $counter['status'] === 'closed' && !$counter['assigned_staff_id']) {
+            flash($counter['counter_name'] . ' has no staff member. Assign one before opening it.', 'error');
+        } elseif ($counter) {
             $newStatus = $counter['status'] === 'open' ? 'closed' : 'open';
             q('UPDATE service_counter SET status = :s WHERE counter_id = :c',
               [':s' => $newStatus, ':c' => $counterId]);
@@ -78,7 +94,11 @@ $counters = q_all(
   LEFT JOIN user u ON u.user_id = sc.assigned_staff_id
    ORDER BY sc.counter_id');
 
-$staffList = q_all('SELECT user_id, full_name FROM user WHERE role = "staff" ORDER BY full_name');
+// Staff list for the dropdown, with the counter each person is already at.
+$staffList = q_all('SELECT u.user_id, u.full_name, sc.counter_name AS at_counter
+                      FROM user u
+                      LEFT JOIN service_counter sc ON sc.assigned_staff_id = u.user_id
+                     WHERE u.role = "staff" ORDER BY u.full_name');
 $openCount = 0;
 foreach ($counters as $c) {
     if ($c['status'] === 'open') {
@@ -184,7 +204,9 @@ page_head('Service counters', 'counters', [
               <?php foreach ($staffList as $s): ?>
                 <option value="<?= (int)$s['user_id'] ?>"
                   <?= (int)($editing['assigned_staff_id'] ?? 0) === (int)$s['user_id'] ? 'selected' : '' ?>>
-                  <?= e($s['full_name']) ?>
+                  <?= e($s['full_name']) ?><?= !empty($s['at_counter'])
+                      && (int)($editing['assigned_staff_id'] ?? 0) !== (int)$s['user_id']
+                      ? ' (at ' . e($s['at_counter']) . ')' : '' ?>
                 </option>
               <?php endforeach; ?>
             </select>

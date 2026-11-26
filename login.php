@@ -4,7 +4,8 @@
  * WHAT IT DOES: Staff and administrator sign-in page (Wireframe 6, FR-20).
  * Checks the CSRF token, then calls auth_attempt() in includes/auth.php,
  * which verifies the password against its bcrypt hash. Admins go to the
- * dashboard, staff to their counter.
+ * dashboard, staff to their counter. Has a "Forgot your password?" link to
+ * forgot_password.php.
  *
  * FIND: login page, sign in, staff login
  */
@@ -56,6 +57,11 @@ page_head('Staff sign in', 'login', ['narrow' => true]);
       <input type="password" id="password" name="password" required placeholder="••••••••">
       <button class="btn block" type="submit">Sign in</button>
     </form>
+
+    <!-- FIND: forgot password link -->
+    <p class="tiny mt" style="text-align:center;">
+      <a href="forgot_password.php">Forgot your password?</a>
+    </p>
 
     <p class="tiny muted mt" style="text-align:center;">
       Your role determines the module loaded: counter staff open the counter

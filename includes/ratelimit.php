@@ -72,6 +72,41 @@ function rate_limit_hit(string $key, int $limit, int $seconds): array
 }
 
 /**
+ * CHECK ONLY: is the caller under the limit? Records nothing. Used with
+ * rate_limit_record() where only successful actions should count - e.g. a
+ * failed join attempt must not use up someone's allowance.
+ * FIND: rate limiting, check limit
+ * @return array{allowed:bool, used:int, retry_after:int}
+ */
+function rate_limit_check(string $key, int $limit, int $seconds): array
+{
+    rate_limit_init();
+    $used = (int)q_val(
+        'SELECT COUNT(*) FROM rate_limit
+          WHERE rate_key = :k AND event_time > DATE_SUB(NOW(), INTERVAL :s SECOND)',
+        [':k' => $key, ':s' => $seconds],
+        0
+    );
+    if ($used < $limit) {
+        return ['allowed' => true, 'used' => $used, 'retry_after' => 0];
+    }
+    $oldest = q_val(
+        'SELECT MIN(event_time) FROM rate_limit
+          WHERE rate_key = :k AND event_time > DATE_SUB(NOW(), INTERVAL :s SECOND)',
+        [':k' => $key, ':s' => $seconds]
+    );
+    $retry = $oldest ? max(1, $seconds - (time() - strtotime((string)$oldest))) : $seconds;
+    return ['allowed' => false, 'used' => $used, 'retry_after' => (int)$retry];
+}
+
+/** RECORD ONLY: count one action against a key (see rate_limit_check()). */
+function rate_limit_record(string $key): void
+{
+    rate_limit_init();
+    q('INSERT INTO rate_limit (rate_key, event_time) VALUES (:k, NOW())', [':k' => $key]);
+}
+
+/**
  * Best-effort visitor IP address (respects a reverse proxy if present).
  * Used as the key for rate limiting.
  * FIND: IP address

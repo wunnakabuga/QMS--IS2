@@ -21,21 +21,7 @@ require_once __DIR__ . '/../includes/pagination.php';
 
 $user = require_role('admin');
 
-/**
- * PASSWORD RULES (NFR-07): at least 8 characters, with letters and numbers.
- * Returns an error message, or null if the password is acceptable.
- * FIND: password rules, password strength, password policy
- */
-function password_problem(string $pw): ?string
-{
-    if (strlen($pw) < 8) {
-        return 'Password must be at least 8 characters.';
-    }
-    if (!preg_match('/[A-Za-z]/', $pw) || !preg_match('/[0-9]/', $pw)) {
-        return 'Password must contain both letters and numbers.';
-    }
-    return null;
-}
+// Password rules: password_problem() in includes/auth.php.
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check($_POST['csrf'] ?? null)) {
     $action = $_POST['action'] ?? '';
@@ -61,7 +47,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check($_POST['csrf'] ?? null))
         } elseif ($pw !== '' && ($msg = password_problem($pw)) !== null) {
             $problem = $msg;
         } else {
-            $clash = q_one('SELECT user_id FROM user WHERE email = :e AND user_id <> :id',
+            // Only other STAFF/ADMIN accounts clash - clients may share emails.
+            $clash = q_one('SELECT user_id FROM user WHERE email = :e AND user_id <> :id
+                              AND role IN ("staff","admin")',
                            [':e' => $email, ':id' => $targetId]);
             if ($clash) {
                 $problem = 'Another account already uses that email address.';

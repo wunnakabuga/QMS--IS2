@@ -18,6 +18,10 @@ $reference = trim($_GET['ref'] ?? '');
 $entry = $reference !== '' ? find_ticket($reference) : null;
 $notFound = $reference !== '' && !$entry;
 
+// Every open ticket this client holds, so someone queueing for several
+// services sees all of them. FIND: multiple tickets
+$myTickets = $entry ? active_tickets_for_user((int)$entry['user_id']) : [];
+
 $queue = [];
 if ($entry) {
     $queue = q_all(
@@ -44,7 +48,7 @@ page_head('Track ticket', 'track');
     <div style="flex:1; min-width:240px;">
       <label for="ref">Ticket number or phone number</label>
       <input type="text" id="ref" name="ref" value="<?= e($reference) ?>"
-             placeholder="A-001 or 07XX XXX XXX" style="margin-bottom:0;">
+             placeholder="e.g. B-004 or 07XX XXX XXX" style="margin-bottom:0;">
     </div>
     <button class="btn" type="submit">Track</button>
   </form>
@@ -53,6 +57,29 @@ page_head('Track ticket', 'track');
 <?php if ($notFound): ?>
   <div class="alert error">No ticket found for &ldquo;<?= e($reference) ?>&rdquo;.
     <a href="join.php">Join the queue</a> to get one.</div>
+<?php endif; ?>
+
+<?php if (count($myTickets) > 1): ?>
+  <div class="panel">
+    <h2>Your tickets (<?= count($myTickets) ?> services)</h2>
+    <table>
+      <thead><tr><th>Ticket</th><th>Service</th><th>Status</th><th>Predicted wait</th><th></th></tr></thead>
+      <tbody>
+      <?php foreach ($myTickets as $t): ?>
+        <?php $isShown = (int)$t['queue_entry_id'] === (int)$entry['queue_entry_id']; ?>
+        <tr class="<?= $isShown ? 'me' : '' ?>">
+          <td><?= e($t['queue_number']) ?></td>
+          <td><?= e($t['service_type']) ?></td>
+          <td><?= badge($t['status']) ?></td>
+          <td><?= in_array($t['status'], ['called','in_service'], true)
+                    ? '&mdash;' : e(fmt_minutes($t['predicted_wait_time'])) ?></td>
+          <td class="right"><?= $isShown ? '<span class="tiny muted">shown below</span>'
+                : '<a href="track.php?ref=' . e(urlencode($t['queue_number'])) . '">View</a>' ?></td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
 <?php endif; ?>
 
 <?php if ($entry): ?>

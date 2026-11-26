@@ -133,7 +133,7 @@ if (strlen($password) < 8
          . "letters and numbers.\n");
 }
 
-$user = q_one('SELECT user_id, full_name, role FROM user WHERE email = :e',
+$user = q_one('SELECT user_id, full_name, role FROM user WHERE email = :e AND role IN ("staff","admin")',
               [':e' => $email]);
 
 $hash = password_hash($password, PASSWORD_DEFAULT);
@@ -166,7 +166,7 @@ if (!$user) {
 }
 
 // Prove it worked rather than assuming it did.
-$stored = (string)q_val('SELECT password_hash FROM user WHERE email = :e',
+$stored = (string)q_val('SELECT password_hash FROM user WHERE email = :e AND role IN ("staff","admin")',
                         [':e' => $email]);
 $verified = password_verify($password, $stored);
 

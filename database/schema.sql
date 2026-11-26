@@ -18,7 +18,12 @@ CREATE TABLE user (
     role           ENUM('client','staff','admin') NOT NULL DEFAULT 'client',
     created_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user_phone (phone_number),
-    UNIQUE KEY uq_user_email (email)
+    -- Email must be unique for staff/admin (they sign in with it); clients
+    -- may share one. staff_email is the email for staff/admin, else NULL.
+    -- FIND: staff email unique
+    staff_email    VARCHAR(120)  AS (IF(role IN ('staff','admin'), email, NULL)) STORED,
+    UNIQUE KEY uq_staff_email (staff_email),
+    INDEX idx_user_email (email)
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------ SERVICE_COUNTER
@@ -65,7 +70,12 @@ CREATE TABLE queue_entry (
         REFERENCES user (user_id) ON DELETE CASCADE,
     CONSTRAINT fk_entry_counter FOREIGN KEY (counter_id)
         REFERENCES service_counter (counter_id) ON DELETE SET NULL,
-    UNIQUE KEY uq_queue_number (queue_number),
+    -- Ticket numbers restart daily (A-001, A-002 ...), so a number is
+    -- unique per day. queue_date is calculated from join_time by MySQL.
+    -- FIND: daily numbering, unique ticket number
+    queue_date       DATE AS (DATE(join_time)) STORED,
+    UNIQUE KEY uq_queue_number_day (queue_date, queue_number),
+    INDEX idx_entry_number (queue_number),
     INDEX idx_entry_status (status, service_type),
     INDEX idx_entry_join (join_time)
 ) ENGINE=InnoDB;
@@ -97,6 +107,23 @@ CREATE TABLE notification (
     CONSTRAINT fk_notif_entry FOREIGN KEY (queue_entry_id)
         REFERENCES queue_entry (queue_entry_id) ON DELETE CASCADE,
     INDEX idx_notif_time (sent_time)
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------- PASSWORD_RESET
+-- One-time "forgot password" links. Only a SHA-256 hash of each token is
+-- stored. Also created automatically by modules/password_reset.php.
+-- FIND: password reset table
+CREATE TABLE password_reset (
+    reset_id    INT AUTO_INCREMENT PRIMARY KEY,
+    user_id     INT          NOT NULL,
+    token_hash  CHAR(64)     NOT NULL,
+    expires_at  DATETIME     NOT NULL,
+    used_at     DATETIME     DEFAULT NULL,
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_reset_token (token_hash),
+    INDEX idx_reset_user (user_id),
+    CONSTRAINT fk_reset_user FOREIGN KEY (user_id)
+        REFERENCES user (user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- =====================================================================

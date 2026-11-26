@@ -21,22 +21,39 @@ require_once __DIR__ . '/prediction.php';
 require_once __DIR__ . '/dispatch.php';
 
 /**
- * TICKET NUMBER (FR-02). Generates today's next number, e.g. A-001, A-002.
- * Numbering restarts every day.
+ * DEPARTMENT LETTER. Each service gets its own ticket letter, taken from its
+ * position in $SERVICE_TYPES (config.php): 1st = A, 2nd = B, 3rd = C ...
+ * Currently: ID Registration A, Birth Certificate B, Business Permit C,
+ * Licence Renewal D. A service added to the list gets the next letter.
+ * FIND: ticket letter, department prefix, service prefix
+ */
+function service_prefix(string $serviceType): string
+{
+    global $SERVICE_TYPES;
+    $index = array_search($serviceType, $SERVICE_TYPES ?? [], true);
+    return $index === false ? QUEUE_PREFIX : chr(ord('A') + (int)$index);
+}
+
+/**
+ * TICKET NUMBER (FR-02). Generates today's next number for a department,
+ * e.g. ID Registration A-001, A-002; Birth Certificate B-001, B-002.
+ * Each department counts separately and numbering restarts every day.
  * FIND: ticket number, queue number, generate number
  */
-function next_queue_number(): string
+function next_queue_number(string $serviceType): string
 {
+    $prefix = service_prefix($serviceType);
     $lastNumber = q_val(
         'SELECT queue_number FROM queue_entry
-          WHERE DATE(join_time) = CURDATE()
-          ORDER BY queue_entry_id DESC LIMIT 1'
+          WHERE queue_date = CURDATE() AND queue_number LIKE :p
+          ORDER BY queue_entry_id DESC LIMIT 1',
+        [':p' => $prefix . '-%']
     );
     $seq = 1;
     if ($lastNumber && preg_match('/(\d+)$/', (string)$lastNumber, $m)) {
         $seq = (int)$m[1] + 1;
     }
-    return sprintf('%s-%03d', QUEUE_PREFIX, $seq);
+    return sprintf('%s-%03d', $prefix, $seq);
 }
 
 /**
@@ -64,8 +81,10 @@ function upsert_client(string $name, string $phone, ?string $email): int
 
 /**
  * ASSIGN COUNTER (FR-03). Picks the open counter for this service with the
- * fewest people waiting, so work is spread evenly.
- * FIND: assign counter, choose counter, spread load
+ * fewest people waiting, so work is spread evenly. Only counters that have
+ * a staff member assigned are considered - a client is never sent to a
+ * counter where nobody can call them.
+ * FIND: assign counter, choose counter, spread load, staffed counter
  */
 function assign_counter(string $serviceType): ?int
 {
@@ -77,6 +96,7 @@ function assign_counter(string $serviceType): ?int
                 ) AS load_count
            FROM service_counter sc
           WHERE sc.service_type = :st AND sc.status = "open"
+            AND sc.assigned_staff_id IS NOT NULL
           ORDER BY load_count ASC, sc.counter_id ASC
           LIMIT 1',
         [':st' => $serviceType]
@@ -117,54 +137,72 @@ function join_queue(string $name, string $phoneRaw, ?string $email,
     if (!in_array($serviceType, $SERVICE_TYPES, true)) {
         return ['ok' => false, 'error' => 'Please select a service.'];
     }
-    if (open_counter_count($serviceType) === 0) {
+    // Refuse the ticket unless an open counter for this service has staff.
+    if (assign_counter($serviceType) === null) {
         return ['ok' => false,
                 'error' => 'No counter is currently open for ' . $serviceType
                            . '. Please choose another service or try later.'];
     }
 
-    // ---- one active ticket per phone number --------------------------
+    // ---- one active ticket per phone number PER SERVICE --------------
+    // A client may queue for several services at once (e.g. ID Registration
+    // and a Business Permit), but not twice for the same service.
+    // FIND: multiple services, one ticket per service, already have a ticket
     $active = q_one(
         'SELECT qe.queue_entry_id, qe.queue_number
            FROM queue_entry qe JOIN user u ON u.user_id = qe.user_id
           WHERE u.phone_number = :p
+            AND qe.service_type = :st
             AND qe.status IN ("waiting","checked_in","called","in_service")
           LIMIT 1',
-        [':p' => $phone]
+        [':p' => $phone, ':st' => $serviceType]
     );
     if ($active) {
         return ['ok' => false,
-                'error' => 'You already hold an active ticket ('
-                           . $active['queue_number'] . '). Track it instead.',
+                'error' => 'You already have ticket ' . $active['queue_number']
+                           . ' for ' . $serviceType . '. Track it instead, or choose a different service.',
                 'entry_id' => (int)$active['queue_entry_id']];
     }
 
     // ---- create ------------------------------------------------------
+    // If two people join at the same instant they can be handed the same
+    // number; the database's unique (date, number) key rejects the second,
+    // and we simply try again with the next number (up to 3 attempts).
+    // FIND: duplicate ticket number, retry
     $pdo = db();
-    $pdo->beginTransaction();
-    try {
-        $userId    = upsert_client($name, $phone, $email);
-        $counterId = assign_counter($serviceType);
-        $number    = next_queue_number();
+    for ($attempt = 1; ; $attempt++) {
+        $pdo->beginTransaction();
+        try {
+            $userId    = upsert_client($name, $phone, $email);
+            $counterId = assign_counter($serviceType);
+            $number    = next_queue_number($serviceType);
 
-        q('INSERT INTO queue_entry
-             (user_id, counter_id, queue_number, service_type, status,
-              join_time, delivery_channel)
-           VALUES (:u, :c, :n, :st, "waiting", NOW(), :ch)',
-          [':u' => $userId, ':c' => $counterId, ':n' => $number,
-           ':st' => $serviceType, ':ch' => $channel]);
+            q('INSERT INTO queue_entry
+                 (user_id, counter_id, queue_number, service_type, status,
+                  join_time, delivery_channel)
+               VALUES (:u, :c, :n, :st, "waiting", NOW(), :ch)',
+              [':u' => $userId, ':c' => $counterId, ':n' => $number,
+               ':st' => $serviceType, ':ch' => $channel]);
 
-        $entryId = (int)$pdo->lastInsertId();
+            $entryId = (int)$pdo->lastInsertId();
 
-        q('INSERT INTO service_log (queue_entry_id, counter_id, status)
-           VALUES (:id, :c, "joined")',
-          [':id' => $entryId, ':c' => $counterId]);
+            q('INSERT INTO service_log (queue_entry_id, counter_id, status)
+               VALUES (:id, :c, "joined")',
+              [':id' => $entryId, ':c' => $counterId]);
 
-        $pdo->commit();
-    } catch (Throwable $ex) {
-        $pdo->rollBack();
-        return ['ok' => false, 'error' => 'Could not create the ticket. '
-                . (APP_DEBUG ? $ex->getMessage() : 'Please try again.')];
+            $pdo->commit();
+            break;
+        } catch (Throwable $ex) {
+            $pdo->rollBack();
+            $numberClash = $ex instanceof PDOException
+                && ($ex->errorInfo[1] ?? 0) === 1062
+                && str_contains($ex->getMessage(), 'uq_queue_number');
+            if ($numberClash && $attempt < 3) {
+                continue;
+            }
+            return ['ok' => false, 'error' => 'Could not create the ticket. '
+                    . (APP_DEBUG ? $ex->getMessage() : 'Please try again.')];
+        }
     }
 
     // ---- trigger prediction (2.0) then dispatch (3.0) ----------------
@@ -218,6 +256,24 @@ function cancel_ticket(int $queueEntryId): array
         WHERE queue_entry_id = :id', [':id' => $queueEntryId]);
     recalculate_predictions($entry['service_type']);
     return ['ok' => true];
+}
+
+/**
+ * All of a client's open tickets (one per service), oldest first. Used by
+ * the Track page to show every service a client is queueing for.
+ * FIND: all my tickets, multiple tickets, other tickets
+ */
+function active_tickets_for_user(int $userId): array
+{
+    return q_all(
+        'SELECT qe.queue_entry_id, qe.queue_number, qe.service_type, qe.status,
+                qe.predicted_wait_time
+           FROM queue_entry qe
+          WHERE qe.user_id = :u
+            AND qe.status IN ("waiting","checked_in","called","in_service")
+          ORDER BY qe.join_time ASC',
+        [':u' => $userId]
+    );
 }
 
 /**

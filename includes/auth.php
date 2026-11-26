@@ -115,6 +115,23 @@ function require_role(string $role): array
 }
 
 /**
+ * PASSWORD RULES (NFR-07): at least 8 characters, with letters and numbers.
+ * Returns an error message, or null if the password is acceptable. Used when
+ * an admin creates/resets an account and on the forgot-password reset page.
+ * FIND: password rules, password strength, password policy
+ */
+function password_problem(string $pw): ?string
+{
+    if (strlen($pw) < 8) {
+        return 'Password must be at least 8 characters.';
+    }
+    if (!preg_match('/[A-Za-z]/', $pw) || !preg_match('/[0-9]/', $pw)) {
+        return 'Password must contain both letters and numbers.';
+    }
+    return null;
+}
+
+/**
  * CSRF PROTECTION. Creates one random 64-character token per session. Every
  * form includes it as a hidden field so a malicious site cannot submit forms
  * on a logged-in user's behalf.
