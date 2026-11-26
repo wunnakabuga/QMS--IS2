@@ -1,5 +1,12 @@
 <?php
 /**
+ * FILE: api/sms_callback.php
+ * WHAT IT DOES: The URL an SMS provider calls back to say whether a message
+ * was delivered. Protected by a secret token; updates the notification's
+ * delivery status.
+ *
+ * FIND: SMS callback, delivery report, webhook
+ *
  * SMS delivery-report (DLR) callback endpoint.
  *
  * When a message is handed to a gateway, the send API only confirms that the
@@ -30,7 +37,7 @@ require_once __DIR__ . '/../modules/sms_gateway.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 
-/** Record every callback so failures can be diagnosed after the fact. */
+/** Append each callback to logs/sms_callback.log for troubleshooting. */
 function callback_log(string $line): void
 {
     $dir = __DIR__ . '/../logs';

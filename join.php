@@ -36,6 +36,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $old['sms'] ? 'sms' : 'e-ticket'
         );
         if ($result['ok']) {
+            // Email the e-ticket when an address was given (no-op unless SMTP
+            // is configured; never blocks the client from joining).
+            if (trim($old['email']) !== '') {
+                try {
+                    require_once __DIR__ . '/modules/mailer.php';
+                    send_eticket_email((int)$result['entry_id']);
+                } catch (\Throwable $mailEx) {
+                    // Email is best-effort; never block the client from joining.
+                }
+            }
             redirect('ticket.php?id=' . $result['entry_id']);
         }
         $error = $result['error'];

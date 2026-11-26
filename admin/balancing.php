@@ -1,5 +1,11 @@
 <?php
 /**
+ * FILE: admin/balancing.php
+ * WHAT IT DOES: Admin view of load balancing - congestion per service, idle
+ * counters, the overflow settings, and how much overflow has helped.
+ *
+ * FIND: load balancing page, overflow settings
+ *
  * Counter load balancing — administrator view.
  *
  * Shows where the demand actually is across the floor, which counters are

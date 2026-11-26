@@ -1,5 +1,13 @@
 <?php
 /**
+ * FILE: account.php
+ * WHAT IT DOES: "My account" - lets any signed-in staff/admin change their
+ * own password. Requires the current password, enforces the password rules
+ * (8+ characters, letters and numbers) and stores the new one as a bcrypt
+ * hash.
+ *
+ * FIND: change password, my account, password rules
+ *
  * Change my password.
  *
  * Available to any authenticated staff member or administrator, so that
@@ -34,6 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (password_verify($new, $record['password_hash'])) {
         $error = 'The new password must be different from the current one.';
     } else {
+        // PASSWORD HASHING: password_hash() with PASSWORD_DEFAULT (bcrypt,
+        // salted automatically). Only the hash is stored, never the password.
+        // FIND: password hashing, hash password, bcrypt
         q('UPDATE user SET password_hash = :h WHERE user_id = :id',
           [':h' => password_hash($new, PASSWORD_DEFAULT), ':id' => $user['user_id']]);
         $done = true;

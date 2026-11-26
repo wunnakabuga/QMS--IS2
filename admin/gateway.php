@@ -1,5 +1,11 @@
 <?php
 /**
+ * FILE: admin/gateway.php
+ * WHAT IT DOES: Admin screen to choose the SMS provider, enter its
+ * credentials, generate the delivery-report token and send a test SMS.
+ *
+ * FIND: SMS settings, gateway settings, test SMS
+ *
  * SMS gateway configuration and connection test (administrator).
  *
  * Lets an administrator select a provider, enter credentials and send a

@@ -1,6 +1,14 @@
 <?php
 /**
+ * FILE: modules/sms_gateway.php
  * SMS gateway driver layer.
+ *
+ * WHAT IT DOES: Actually sends SMS messages through a provider (Africa's
+ * Talking, Twilio, a generic HTTP gateway) or simulates sending, and reads
+ * the delivery reports that providers send back.
+ *
+ * FIND: SMS gateway, send SMS, Africa's Talking, Twilio, simulate SMS,
+ *       delivery report
  *
  * The dispatch module (process 3.0) does not know or care which gateway is
  * in use. It calls sms_send() and receives a normalised result. Everything
@@ -85,7 +93,10 @@ function sms_http_post(string $url, array $headers, $body, int $timeout = 15): a
 
 // ---------------------------------------------------------------- drivers
 
-/** Africa's Talking: the gateway named in Section 3.5 of the report. */
+/**
+ * Send through Africa's Talking: the gateway named in Section 3.5 of the report.
+ * FIND: Africa's Talking, africastalking
+ */
 function sms_driver_africastalking(string $phone, string $message, array $cfg): array
 {
     $username = $cfg['username'] ?? '';
@@ -234,7 +245,11 @@ function sms_driver_generic(string $phone, string $message, array $cfg): array
             . substr((string)$body, 0, 160), 'reference' => null, 'http_code' => $code];
 }
 
-/** Simulation: compose and record, transmit nothing. */
+/**
+ * Simulation mode: build and log the message but send nothing (the default
+ * for the prototype, so no paid account is needed).
+ * FIND: simulate SMS, simulation mode
+ */
 function sms_driver_simulate(string $phone, string $message, array $cfg): array
 {
     return ['status' => 'simulated',
@@ -264,6 +279,8 @@ function sms_config(): array
 }
 
 /**
+ * SEND ONE SMS - the only function the rest of the system calls.
+ * FIND: send SMS, sms_send
  * Send one message through the active gateway.
  * This is the only function the rest of the system calls.
  */
@@ -311,6 +328,7 @@ function sms_test(string $phone): array
 }
 
 /**
+ * FIND: delivery report, SMS callback, delivered
  * Normalise a provider's delivery report into (reference, status, detail).
  *
  * Africa's Talking posts: id, status, phoneNumber, networkCode,

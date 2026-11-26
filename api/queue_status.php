@@ -1,5 +1,12 @@
 <?php
 /**
+ * FILE: api/queue_status.php
+ * WHAT IT DOES: Returns JSON for one ticket (position, predicted wait, now
+ * serving). Called every few seconds by assets/js/app.js so the ticket page
+ * updates without reloading. Also triggers due reminders.
+ *
+ * FIND: ticket API, AJAX, live update, polling
+ *
  * AJAX endpoint backing the live ticket view (FR-13).
  * Returns the current position, predicted waiting time and now-serving
  * number for one queue entry.

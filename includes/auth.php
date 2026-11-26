@@ -1,10 +1,25 @@
 <?php
 /**
- * Authentication and role-based access control.
+ * FILE: includes/auth.php
+ * WHAT IT DOES: Staff/admin login, logout, sessions, role-based access
+ * control (staff vs admin pages) and CSRF protection for forms.
  * Implements FR-20 and NFR-07.
+ *
+ * Passwords are never stored in plain text. They are hashed with PHP's
+ * password_hash() (bcrypt) when an account is created or a password is
+ * changed - see admin/users.php and account.php - and checked here with
+ * password_verify() at login.
+ *
+ * FIND: login, authentication, password verification, session, logout,
+ *       role based access control, CSRF token
  */
 require_once __DIR__ . '/helpers.php';
 
+/**
+ * Start the PHP session if one is not already running (skipped on the
+ * command line, where tests and scheduled tasks run).
+ * FIND: start session
+ */
 function auth_start(): void
 {
     // Sessions are meaningless on the command line, where the test suite and
@@ -18,6 +33,15 @@ function auth_start(): void
     }
 }
 
+/**
+ * LOGIN CHECK. Looks up the staff/admin account by email and compares the
+ * typed password against the stored bcrypt hash with password_verify().
+ * The plain password is never stored or compared directly. On success the
+ * session id is regenerated (prevents session fixation) and the user is
+ * saved in the session. Returns the user, or null if login failed.
+ * FIND: login, password verification, password_verify, check password,
+ *       session fixation
+ */
 function auth_attempt(string $email, string $password): ?array
 {
     $user = q_one(
@@ -44,12 +68,17 @@ function auth_attempt(string $email, string $password): ?array
     return $_SESSION['user'];
 }
 
+/** Return the currently logged-in user from the session, or null. */
 function auth_user(): ?array
 {
     auth_start();
     return $_SESSION['user'] ?? null;
 }
 
+/**
+ * Log out: clear the session data and destroy the session.
+ * FIND: logout, sign out, destroy session
+ */
 function auth_logout(): void
 {
     auth_start();
@@ -57,7 +86,10 @@ function auth_logout(): void
     session_destroy();
 }
 
-/** Require any authenticated staff or admin. */
+/**
+ * Page guard: send visitors who are not logged in to the login page.
+ * FIND: require login, protect page
+ */
 function require_login(): array
 {
     $u = auth_user();
@@ -67,7 +99,11 @@ function require_login(): array
     return $u;
 }
 
-/** Require a specific role. */
+/**
+ * ROLE-BASED ACCESS CONTROL. Page guard that only lets a user with the
+ * given role ("staff" or "admin") through; anyone else gets HTTP 403.
+ * FIND: role based access control, authorisation, admin only, 403
+ */
 function require_role(string $role): array
 {
     $u = require_login();
@@ -78,7 +114,12 @@ function require_role(string $role): array
     return $u;
 }
 
-/** CSRF token helpers. */
+/**
+ * CSRF PROTECTION. Creates one random 64-character token per session. Every
+ * form includes it as a hidden field so a malicious site cannot submit forms
+ * on a logged-in user's behalf.
+ * FIND: CSRF token, cross-site request forgery
+ */
 function csrf_token(): string
 {
     auth_start();
@@ -88,6 +129,11 @@ function csrf_token(): string
     return $_SESSION['csrf'];
 }
 
+/**
+ * Check a submitted form's CSRF token against the session's token.
+ * hash_equals() is used so the comparison takes constant time.
+ * FIND: CSRF check, verify token
+ */
 function csrf_check(?string $token): bool
 {
     auth_start();

@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 """
+FILE: ml/generate_dataset.py
+WHAT IT DOES: Creates the 1,000-row training dataset by simulating a busy
+service centre (arrivals, counters, service times). Run before training.
+
+FIND: dataset, training data, simulation, generate data
+
 Generate the simulated training dataset described in Chapter 3, Section 3.5.
 
 1,000 records of queue observations are produced from a discrete-event
@@ -92,6 +98,7 @@ def simulate_session(service_type, hour):
 
 
 def main():
+    """Simulate N_RECORDS sessions and write them to queue_dataset.csv."""
     OUT.parent.mkdir(parents=True, exist_ok=True)
     rows = []
     hours = list(HOURLY_INTENSITY.keys())

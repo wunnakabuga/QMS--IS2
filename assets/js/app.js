@@ -1,10 +1,16 @@
-/* Client-side behaviour.
+/* FILE: assets/js/app.js
+   WHAT IT DOES: Browser-side code. Polls the api/ endpoints so the ticket
+   page and counter console update live without reloading, and draws the
+   ticket QR code.
+   FIND: live update, polling, AJAX, QR code, JavaScript
+
    Asynchronous polling keeps queue position and predicted waiting time
    current without a page reload (FR-13, NFR-01). */
 
 const QMS = (() => {
   const DEFAULT_INTERVAL = 15000;
 
+  /* Put a value into the element marked data-live="selector". */
   function setText(selector, value) {
     const el = document.querySelector(`[data-live="${selector}"]`);
     if (el && value !== undefined && value !== null) {
@@ -12,6 +18,7 @@ const QMS = (() => {
     }
   }
 
+  /* Ask api/queue_status.php for the latest ticket data (JSON). */
   async function fetchTicket(entryId) {
     try {
       const res = await fetch(`api/queue_status.php?id=${entryId}`, {
@@ -25,6 +32,7 @@ const QMS = (() => {
     }
   }
 
+  /* Update the ticket page with the fresh position, wait and now-serving. */
   function applyTicket(data) {
     if (!data || !data.ok) return;
 
@@ -48,12 +56,15 @@ const QMS = (() => {
     }
   }
 
+  /* LIVE TICKET UPDATES: refresh the ticket every 15 seconds.
+     FIND: polling, live update */
   function pollTicket(entryId, interval = DEFAULT_INTERVAL) {
     const tick = async () => applyTicket(await fetchTicket(entryId));
     tick();
     setInterval(tick, interval);
   }
 
+  /* Reload the whole page on a timer (used by simpler screens). */
   function autoReload(interval = DEFAULT_INTERVAL) {
     setInterval(() => window.location.reload(), interval);
   }
@@ -73,7 +84,8 @@ const QMS = (() => {
     }, interval);
   }
 
-  /* Render a QR code into an element carrying a data-value attribute.
+  /* FIND: QR code
+     Render a QR code into an element carrying a data-value attribute.
      Uses the bundled qrcode-generator library, so no internet connection is
      needed at runtime. */
   function renderQr(elementId) {

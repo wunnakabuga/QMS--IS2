@@ -1,6 +1,14 @@
 <?php
 /**
+ * FILE: modules/dispatch.php
  * Process 3.0 — Ticket and Notification Dispatch Module
+ *
+ * WHAT IT DOES: Delivers the ticket to the client - on screen (e-ticket) or
+ * by SMS - writes each message and its delivery result to the notification
+ * table, and sends the "your turn is near" reminder SMS.
+ *
+ * FIND: send ticket, SMS ticket, e-ticket, notification, reminder SMS,
+ *       message text, retry
  *
  * Implements FR-07 to FR-10. Routes confirmed ticket data to the browser
  * (e-ticket) or to the SMS gateway according to the delivery channel
@@ -11,7 +19,10 @@ require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/helpers.php';
 require_once __DIR__ . '/sms_gateway.php';
 
-/** Compose the plain-text ticket message used on the SMS channel. */
+/**
+ * Write the text of the ticket SMS (number, service, position, predicted wait).
+ * FIND: ticket message, SMS text
+ */
 function compose_ticket_message(array $entry, ?int $position): string
 {
     $lines = [
@@ -33,7 +44,10 @@ function compose_ticket_message(array $entry, ?int $position): string
     return implode("\n", $lines);
 }
 
-/** Compose the reminder message sent as the client's turn approaches. */
+/**
+ * Write the text of the reminder SMS sent when the client's turn is near.
+ * FIND: reminder message
+ */
 function compose_reminder_message(array $entry): string
 {
     return "REMINDER\n"
@@ -43,7 +57,10 @@ function compose_reminder_message(array $entry): string
         . 'Ticket expires ' . GRACE_PERIOD_MINUTES . ' min after being called.';
 }
 
-/** Persist a notification record (FR-09). */
+/**
+ * Save a record of every message sent and its delivery status (FR-09).
+ * FIND: notification log, save notification, delivery status
+ */
 function record_notification(int $queueEntryId, string $channel,
                              string $status, string $message,
                              ?string $reference = null, ?string $detail = null,
@@ -60,6 +77,7 @@ function record_notification(int $queueEntryId, string $channel,
 }
 
 /**
+ * FIND: send SMS, retry SMS
  * Send over SMS and record the result, retrying once on a transient failure.
  * A gateway refusing the message (bad number, no credit) is not retried,
  * because the second attempt would fail the same way and cost money.
@@ -92,6 +110,8 @@ function send_and_record_sms(int $queueEntryId, string $phone, string $message):
 }
 
 /**
+ * SEND THE TICKET. Chooses SMS or e-ticket based on what the client picked.
+ * FIND: send ticket, dispatch ticket, delivery channel
  * Dispatch the ticket for a queue entry over its configured channel.
  * This is the branching rule documented in Wireframe 5.
  */
@@ -120,6 +140,9 @@ function dispatch_ticket(int $queueEntryId): array
 }
 
 /**
+ * REMINDERS (FR-10). Sends one reminder SMS per client once their predicted
+ * wait drops to REMINDER_THRESHOLD_MINUTES. Run by the scheduled task.
+ * FIND: send reminders, reminder SMS, turn approaching
  * Dispatch reminders for entries whose predicted wait has fallen to the
  * threshold and that have not yet been reminded (FR-10).
  */
@@ -159,6 +182,9 @@ function dispatch_due_reminders(): int
 }
 
 /**
+ * Load everything shown on a ticket page: client, counter, status,
+ * prediction and live position.
+ * FIND: ticket details, view ticket
  * Full ticket view for a queue entry, joining the client and counter and
  * computing the derived queue_position attribute.
  */

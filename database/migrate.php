@@ -1,5 +1,11 @@
 <?php
 /**
+ * FILE: database/migrate.php
+ * WHAT IT DOES: Upgrades an existing database to the latest structure
+ * (adds missing columns, tables and indexes) without deleting data.
+ *
+ * FIND: database migration, upgrade database, schema changes
+ *
  * Idempotent schema migration.
  *
  * database/schema.sql drops and recreates the database, which destroys data.

@@ -1,6 +1,14 @@
 <?php
 /**
+ * FILE: modules/queue_registration.php
  * Process 1.0 — Queue Registration Module
+ *
+ * WHAT IT DOES: Everything that happens when a client joins the queue -
+ * validating their details, saving them, issuing a ticket number, choosing a
+ * counter - plus check-in, cancelling and looking a ticket up.
+ *
+ * FIND: join queue, register client, ticket number, assign counter,
+ *       check in, cancel ticket, find ticket
  *
  * Implements FR-01, FR-02, FR-03 and FR-11. Creates or updates the client
  * record, issues a sequential queue number, assigns the entry to a counter
@@ -12,7 +20,11 @@ require_once __DIR__ . '/../includes/helpers.php';
 require_once __DIR__ . '/prediction.php';
 require_once __DIR__ . '/dispatch.php';
 
-/** FR-02: generate the next sequential queue number for today. */
+/**
+ * TICKET NUMBER (FR-02). Generates today's next number, e.g. A-001, A-002.
+ * Numbering restarts every day.
+ * FIND: ticket number, queue number, generate number
+ */
 function next_queue_number(): string
 {
     $lastNumber = q_val(
@@ -27,7 +39,11 @@ function next_queue_number(): string
     return sprintf('%s-%03d', QUEUE_PREFIX, $seq);
 }
 
-/** Find or create the client user record. */
+/**
+ * Save the client: update them if their phone number is already known,
+ * otherwise create a new client record. Clients have no password.
+ * FIND: save client, create client
+ */
 function upsert_client(string $name, string $phone, ?string $email): int
 {
     $existing = q_one(
@@ -47,8 +63,9 @@ function upsert_client(string $name, string $phone, ?string $email): int
 }
 
 /**
- * FR-03: pick the open counter for the service type with the fewest
- * outstanding entries, so that load is spread across counters.
+ * ASSIGN COUNTER (FR-03). Picks the open counter for this service with the
+ * fewest people waiting, so work is spread evenly.
+ * FIND: assign counter, choose counter, spread load
  */
 function assign_counter(string $serviceType): ?int
 {
@@ -68,7 +85,12 @@ function assign_counter(string $serviceType): ?int
 }
 
 /**
- * Join the queue. Returns the created entry, or an error.
+ * JOIN THE QUEUE - the main registration function. Validates name, phone,
+ * email and service; refuses a second active ticket for the same phone;
+ * then, inside one database transaction, saves the client, assigns a
+ * counter and creates the ticket. Afterwards it recalculates predictions
+ * and sends the ticket (e-ticket or SMS).
+ * FIND: join queue, register, input validation, create ticket, transaction
  *
  * @return array{ok:bool, entry_id?:int, queue_number?:string, error?:string}
  */
@@ -152,7 +174,10 @@ function join_queue(string $name, string $phoneRaw, ?string $email,
     return ['ok' => true, 'entry_id' => $entryId, 'queue_number' => $number];
 }
 
-/** FR-11: client confirms attendance. */
+/**
+ * CHECK IN (FR-11). The client confirms they are physically at the centre.
+ * FIND: check in, confirm attendance
+ */
 function check_in(int $queueEntryId): array
 {
     $entry = q_one('SELECT status, service_type FROM queue_entry
@@ -171,7 +196,11 @@ function check_in(int $queueEntryId): array
     return ['ok' => true];
 }
 
-/** Client cancels their own ticket. */
+/**
+ * The client cancels their own ticket; everyone behind them gets an updated
+ * prediction.
+ * FIND: cancel ticket, leave queue
+ */
 function cancel_ticket(int $queueEntryId): array
 {
     $entry = q_one('SELECT status, service_type FROM queue_entry
@@ -191,7 +220,11 @@ function cancel_ticket(int $queueEntryId): array
     return ['ok' => true];
 }
 
-/** Locate a ticket by queue number or phone number (used by track.php). */
+/**
+ * Look up a ticket by its number (e.g. A-012) or by phone number.
+ * Used by the Track ticket page.
+ * FIND: find ticket, track ticket, search ticket
+ */
 function find_ticket(string $reference): ?array
 {
     $reference = trim($reference);

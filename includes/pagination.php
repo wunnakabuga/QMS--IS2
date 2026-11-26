@@ -1,8 +1,15 @@
 <?php
-/** Shared pagination helper for the administrative tables. */
+/**
+ * FILE: includes/pagination.php
+ * WHAT IT DOES: Splits long admin tables (users, reports, logs) into pages
+ * and draws the "Previous 1 2 3 Next" links.
+ *
+ * FIND: pagination, paging, next page
+ */
 require_once __DIR__ . '/helpers.php';
 
 /**
+ * Work out which page is being viewed and the SQL OFFSET/LIMIT to use.
  * @return array{page:int, per:int, offset:int, pages:int, total:int}
  */
 function paginate(int $total, int $perPage = 25, string $param = 'page'): array
@@ -20,7 +27,7 @@ function paginate(int $total, int $perPage = 25, string $param = 'page'): array
     ];
 }
 
-/** Render the pager, preserving every other query parameter. */
+/** Draw the Previous / page numbers / Next links, keeping any filters in the URL. */
 function pager(array $p, string $param = 'page'): string
 {
     if ($p['pages'] <= 1) {

@@ -1,5 +1,11 @@
 <?php
 /**
+ * FILE: feedback.php
+ * WHAT IT DOES: Short client feedback form after service - satisfaction and
+ * whether the predicted wait was accurate - plus an optional comment.
+ *
+ * FIND: feedback, satisfaction survey, client rating
+ *
  * Client feedback.
  *
  * Collects the satisfaction and perceived-accuracy measures that Section

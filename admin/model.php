@@ -1,5 +1,12 @@
 <?php
 /**
+ * FILE: admin/model.php
+ * WHAT IT DOES: Admin page about the machine learning model - how it was
+ * trained, feature importance, live accuracy (MAE/RMSE) against a baseline,
+ * how often the fallback was used, and a live test prediction.
+ *
+ * FIND: model page, model performance, feature importance, model accuracy
+ *
  * Prediction model screen (administrator).
  *
  * Named in the navigation of Wireframe 8. Reports how the Random Forest

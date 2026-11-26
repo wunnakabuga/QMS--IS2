@@ -1,5 +1,11 @@
 <?php
 /**
+ * FILE: admin/monitor.php
+ * WHAT IT DOES: Live view of the whole centre for admins - every counter,
+ * who is being served and the queue per service. Refreshes itself.
+ *
+ * FIND: live monitor, queue monitor
+ *
  * Live queue monitor (administrator).
  *
  * Named in the navigation of Wireframe 8. Shows the whole centre at once:

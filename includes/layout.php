@@ -1,14 +1,27 @@
 <?php
-/** Shared page chrome. */
+/**
+ * FILE: includes/layout.php
+ * WHAT IT DOES: The shared page frame used by every screen - the <head>,
+ * the top bar with logo and menu (different menu for public, staff and
+ * admin), the skip-to-content link, flash messages, and the footer.
+ *
+ * FIND: layout, header, navigation menu, footer, page template, skip link
+ */
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/auth.php';
 
+/** Relative path back to the site root, so links work from any folder. */
 function base_url(): string
 {
     // Depth-aware relative root so the app works in any subdirectory.
     return defined('QMS_ROOT') ? QMS_ROOT : './';
 }
 
+/**
+ * Print the top of every page: <head>, stylesheet, skip link, top bar and
+ * the menu for the current user's role, then any flash message.
+ * FIND: page header, navigation menu, menu by role
+ */
 function page_head(string $title, string $active = '', array $opts = []): void
 {
     $root = base_url();
@@ -60,6 +73,7 @@ function page_head(string $title, string $active = '', array $opts = []): void
     }
 }
 
+/** Print the bottom of every page: footer and closing tags. */
 function page_foot(): void
 {
     ?>
@@ -74,6 +88,7 @@ function page_foot(): void
 }
 
 /** Render a status badge. */
+/** A coloured status pill, e.g. "Waiting", "In Service". */
 function badge(string $status): string
 {
     return '<span class="badge ' . e($status) . '">'

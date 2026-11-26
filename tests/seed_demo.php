@@ -1,5 +1,9 @@
 <?php
 /**
+ * FILE: tests/seed_demo.php
+ * WHAT IT DOES: Fills the database with a realistic day of demo data.
+ * FIND: demo data, seed data, sample data
+ *
  * Populate the database with a plausible day of activity so that the
  * dashboard, reports and prediction accuracy figures have something to
  * show during demonstration and evaluation.

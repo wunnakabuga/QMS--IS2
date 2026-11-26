@@ -1,5 +1,12 @@
 <?php
-/** Administrator dashboard — Wireframe 8. Implements FR-18 and FR-19. */
+/**
+ * FILE: admin/dashboard.php
+ * WHAT IT DOES: Admin home screen (Wireframe 8, FR-18, FR-19). Today's key
+ * figures (in queue, served, peak, average wait), prediction accuracy, and
+ * recent tickets with predicted vs actual wait.
+ *
+ * FIND: admin dashboard, KPIs, key figures
+ */
 define('QMS_ROOT', '../');
 require_once __DIR__ . '/../includes/layout.php';
 require_once __DIR__ . '/../modules/service_delivery.php';

@@ -1,5 +1,10 @@
 <?php
 /**
+ * FILE: tests/seed_congestion.php
+ * WHAT IT DOES: Sets up a busy queue next to an idle counter to demo load
+ * balancing.
+ * FIND: congestion demo, load balancing demo
+ *
  * Create a congested-queue scenario for demonstrating load balancing.
  *
  * The demo seed produces a balanced floor, which is the normal state and so

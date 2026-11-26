@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
 """
+FILE: ml/train_model.py
+WHAT IT DOES: Trains the Random Forest model on the dataset, tests it on
+20% of the data it has never seen (MAE, MSE, RMSE, R2, cross-validation,
+comparison with a baseline), and saves the model for predict.py to use.
+
+FIND: train model, random forest, train test split, model accuracy, MAE,
+      RMSE, R2, cross validation, baseline, hyperparameters
+
 Train the Random Forest Regression model that predicts client waiting time.
 
 Follows the model selection justified in Chapter 2, Section 2.3.5 and the
@@ -122,6 +130,7 @@ def verify_export(model, X_test) -> None:
 
 
 def main():
+    """Load the data, train and evaluate the model, and save it."""
     if not DATA.exists():
         raise SystemExit(f"Dataset not found at {DATA}. "
                          f"Run generate_dataset.py first.")
@@ -132,11 +141,15 @@ def main():
     X = df[FEATURES]
     y = df[TARGET]
 
+    # TRAIN/TEST SPLIT: 80% to train, 20% held back to test.
+    # FIND: train test split
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=RANDOM_STATE
     )
     print(f"Training partition: {len(X_train)}   test partition: {len(X_test)}")
 
+    # THE MODEL: 300 decision trees averaged together.
+    # FIND: random forest, hyperparameters, n_estimators
     model = RandomForestRegressor(
         n_estimators=300,
         max_depth=None,
@@ -147,6 +160,7 @@ def main():
     )
     model.fit(X_train, y_train)
 
+    # EVALUATION on the unseen test data. FIND: MAE, MSE, RMSE, R2, evaluation
     pred = model.predict(X_test)
     mae = mean_absolute_error(y_test, pred)
     # MSE penalises a large error far more heavily than several small ones,

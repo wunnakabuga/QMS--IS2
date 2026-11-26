@@ -1,6 +1,10 @@
 <?php
 /**
- * Runtime settings held in the database.
+ * FILE: modules/settings.php
+ * WHAT IT DOES: Settings stored in the database (app_setting table) that an
+ * admin can change from the interface, e.g. SMS gateway credentials.
+ *
+ * FIND: settings, app settings, change settings
  *
  * Gateway credentials and queue rules can be changed by an administrator
  * from the interface rather than by editing config/config.php and
@@ -9,6 +13,7 @@
  */
 require_once __DIR__ . '/../includes/db.php';
 
+/** Create the app_setting table the first time it is needed. */
 function settings_init(): void
 {
     static $done = false;
@@ -36,7 +41,10 @@ function &setting_cache(): ?array
     return $cache;
 }
 
-/** Read one setting, falling back to the supplied default. */
+/**
+ * Read one setting, or return the default if it has not been set.
+ * FIND: read setting, get setting
+ */
 function setting_get(string $key, $default = null)
 {
     $cache = &setting_cache();
@@ -51,7 +59,10 @@ function setting_get(string $key, $default = null)
     return ($value === null || $value === '') ? $default : $value;
 }
 
-/** Write one setting. */
+/**
+ * Save one setting (inserts it, or updates it if it exists).
+ * FIND: save setting
+ */
 function setting_set(string $key, ?string $value): void
 {
     settings_init();
@@ -76,7 +87,7 @@ function setting_flush(): void
     $cache = null;
 }
 
-/** Everything, for the settings screen. */
+/** Every stored setting, for the admin settings screens. */
 function settings_all(): array
 {
     settings_init();

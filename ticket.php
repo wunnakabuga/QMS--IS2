@@ -1,5 +1,12 @@
 <?php
-/** E-ticket — Wireframe 3. Implements FR-07 and FR-11. */
+/**
+ * FILE: ticket.php
+ * WHAT IT DOES: The client's e-ticket (Wireframe 3, FR-07, FR-11). Shows
+ * ticket number, QR code, position, predicted wait and live "now serving",
+ * which refresh automatically. The client can check in or cancel here.
+ *
+ * FIND: e-ticket, ticket page, QR code, check in button, cancel button
+ */
 define('QMS_ROOT', './');
 require_once __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/modules/queue_registration.php';

@@ -1,5 +1,12 @@
 <?php
-/** Service counter configuration — Wireframe 9. Implements FR-17. */
+/**
+ * FILE: admin/counters.php
+ * WHAT IT DOES: Counter setup (Wireframe 9, FR-17). Add, edit, open, close
+ * and delete counters and assign staff to them. Opening or closing a
+ * counter recalculates waiting-time predictions.
+ *
+ * FIND: manage counters, add counter, assign staff, open counter, close counter
+ */
 define('QMS_ROOT', '../');
 require_once __DIR__ . '/../includes/layout.php';
 require_once __DIR__ . '/../modules/prediction.php';

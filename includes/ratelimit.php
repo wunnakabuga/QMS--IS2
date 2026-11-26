@@ -1,6 +1,10 @@
 <?php
 /**
- * Simple database-backed rate limiter.
+ * FILE: includes/ratelimit.php
+ * WHAT IT DOES: A simple database-backed rate limiter (anti-spam). Used on
+ * the join queue form (join.php) and the feedback form (feedback.php).
+ *
+ * FIND: rate limiting, spam protection, too many attempts
  *
  * Prevents one person flooding the queue with tickets from the join form.
  * Counts are kept in a table rather than the session, because a session is
@@ -26,7 +30,9 @@ function rate_limit_init(): void
 }
 
 /**
- * Record an attempt and report whether the caller is over the limit.
+ * RATE LIMIT CHECK. Record an attempt and report whether the caller is over
+ * the limit, e.g. at most N tickets from one IP address in 10 minutes.
+ * FIND: rate limiting, too many attempts, block spam
  *
  * @param string $key     What is being limited, e.g. "join:197.248.1.1"
  * @param int    $limit   Attempts permitted within the window
@@ -65,7 +71,11 @@ function rate_limit_hit(string $key, int $limit, int $seconds): array
     return ['allowed' => true, 'used' => $used + 1, 'retry_after' => 0];
 }
 
-/** Best-effort client address, respecting a reverse proxy if one is present. */
+/**
+ * Best-effort visitor IP address (respects a reverse proxy if present).
+ * Used as the key for rate limiting.
+ * FIND: IP address
+ */
 function client_ip(): string
 {
     foreach (['HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'REMOTE_ADDR'] as $header) {
@@ -80,7 +90,7 @@ function client_ip(): string
     return 'unknown';
 }
 
-/** Friendly wording for a retry delay. */
+/** Friendly wording for how long to wait, e.g. "about 3 minutes". */
 function retry_phrase(int $seconds): string
 {
     if ($seconds < 60) {

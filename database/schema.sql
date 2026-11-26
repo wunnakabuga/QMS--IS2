@@ -90,7 +90,7 @@ CREATE TABLE service_log (
 CREATE TABLE notification (
     notification_id INT AUTO_INCREMENT PRIMARY KEY,
     queue_entry_id  INT NOT NULL,
-    channel         ENUM('e-ticket','sms') NOT NULL,
+    channel         ENUM('e-ticket','sms','email') NOT NULL,
     sent_time       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     delivery_status VARCHAR(30) NOT NULL DEFAULT 'pending',
     message_content TEXT,

@@ -1,5 +1,12 @@
 <?php
 /**
+ * FILE: board.php
+ * WHAT IT DOES: The "Now serving" TV screen for the waiting area. Shows
+ * which ticket is at which counter and who is next, reloads every 15
+ * seconds, and reads new calls aloud (with a mute button).
+ *
+ * FIND: display board, now serving screen, TV screen, voice announcement
+ *
  * Public queue display board.
  *
  * Intended for a screen in the waiting area. Section 1.6.2 of the report
@@ -155,6 +162,7 @@ $avgWait = q_val(
   }
   paint();
 
+  // VOICE ANNOUNCEMENT. FIND: voice announcement, text to speech
   // Which tickets are being called right now, with their counter.
   var current = [].slice.call(document.querySelectorAll('.scard')).map(function (c) {
     var num = (c.querySelector('.num') || {}).textContent || '';

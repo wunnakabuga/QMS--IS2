@@ -1,5 +1,11 @@
 <?php
-/** AJAX endpoint backing the counter console's live queue panel. */
+/**
+ * FILE: api/counter_status.php
+ * WHAT IT DOES: Returns JSON for the staff counter screen's live panel
+ * (waiting count, served today, current client). Staff/admin only.
+ *
+ * FIND: counter API, AJAX, live update
+ */
 require_once __DIR__ . '/../includes/helpers.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../modules/service_delivery.php';

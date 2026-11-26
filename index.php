@@ -1,5 +1,12 @@
 <?php
-/** Landing page — Wireframe 1. */
+/**
+ * FILE: index.php
+ * WHAT IT DOES: The public home page (Wireframe 1). Shows how many people
+ * are in the queue, open counters and the average predicted wait, with
+ * buttons to join the queue or track a ticket.
+ *
+ * FIND: home page, landing page
+ */
 define('QMS_ROOT', './');
 require_once __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/modules/prediction.php';

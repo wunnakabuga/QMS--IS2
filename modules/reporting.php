@@ -1,6 +1,15 @@
 <?php
 /**
+ * FILE: modules/reporting.php
  * Process 6.0 — Reporting and Analytics Module
+ *
+ * WHAT IT DOES: All the read-only queries behind the admin Reports page -
+ * headline figures, prediction accuracy (MAE, MSE, RMSE), waits by service,
+ * demand by hour, the day/hour heat map, counter performance and the
+ * service log extract for export.
+ *
+ * FIND: reports, analytics, prediction accuracy, MAE, RMSE, heat map,
+ *       peak hours, counter performance, export
  *
  * Implements FR-18 and FR-19. Every function here reads only; no reporting
  * operation writes to the operational tables, which preserves the integrity
@@ -9,6 +18,8 @@
 require_once __DIR__ . '/../includes/db.php';
 
 /**
+ * Clean up the report filters (date range, service, counter) from the form.
+ * FIND: report filters, date range
  * Normalise the report filters supplied by the administrator.
  *
  * @return array{from:string, to:string, service:string, counter:int}
@@ -37,7 +48,10 @@ function report_filters(array $input): array
     ];
 }
 
-/** Build the shared WHERE clause and bindings for a filtered report. */
+/**
+ * Build the SQL WHERE clause for the chosen filters. Values are returned as
+ * bound parameters, never pasted into the SQL.
+ */
 function report_where(array $f, string $alias = 'qe'): array
 {
     $sql = " WHERE DATE($alias.join_time) BETWEEN :from AND :to ";
@@ -54,7 +68,13 @@ function report_where(array $f, string $alias = 'qe'): array
     return [$sql, $params];
 }
 
-/** Headline figures for the filtered period. */
+/**
+ * Headline figures for the period: clients served, average actual and
+ * predicted wait, and PREDICTION ACCURACY - MAE (mean absolute error), MSE,
+ * RMSE and % within 5 minutes - computed only over model predictions.
+ * FIND: prediction accuracy, MAE, MSE, RMSE, mean absolute error,
+ *       summary statistics, average waiting time
+ */
 function report_summary(array $f): array
 {
     [$where, $params] = report_where($f);
@@ -128,7 +148,10 @@ function report_summary(array $f): array
     ];
 }
 
-/** Average actual waiting time grouped by service type. */
+/**
+ * Average actual waiting time per service.
+ * FIND: wait by service
+ */
 function report_by_service(array $f): array
 {
     [$where, $params] = report_where($f);
@@ -149,7 +172,10 @@ function report_by_service(array $f): array
     );
 }
 
-/** Demand by hour of day across the filtered period. */
+/**
+ * Number of clients per hour of the day (the bar chart).
+ * FIND: peak hours, demand by hour
+ */
 function report_by_hour(array $f): array
 {
     [$where, $params] = report_where($f);
@@ -166,7 +192,10 @@ function report_by_hour(array $f): array
     return $byHour;
 }
 
-/** Demand by day of week and hour — the heat map in Wireframe 10. */
+/**
+ * Demand by day of week and hour - the heat map in Wireframe 10.
+ * FIND: heat map, busiest day
+ */
 function report_heatmap(array $f): array
 {
     [$where, $params] = report_where($f);
@@ -186,7 +215,10 @@ function report_heatmap(array $f): array
     return $grid;
 }
 
-/** Counter performance over the filtered period. */
+/**
+ * Per-counter performance: clients served and average service time.
+ * FIND: counter performance, staff performance
+ */
 function report_by_counter(array $f): array
 {
     [$where, $params] = report_where($f);
@@ -212,6 +244,7 @@ function report_by_counter(array $f): array
 }
 
 /**
+ * FIND: service log extract, predicted vs actual, export CSV
  * The service log extract: one row per queue entry with predicted, actual
  * and variance. This is the table exported for Chapter 5 analysis.
  */

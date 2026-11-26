@@ -1,5 +1,11 @@
 <?php
 /**
+ * FILE: tasks/run_maintenance.php
+ * WHAT IT DOES: Background job run every minute (Task Scheduler / cron):
+ * expires lapsed tickets, sends due reminders, refreshes predictions.
+ *
+ * FIND: scheduled task, cron, background job, maintenance
+ *
  * Scheduled maintenance task.
  *
  * Without this, ticket expiry (FR-12) and reminder dispatch (FR-10) only run

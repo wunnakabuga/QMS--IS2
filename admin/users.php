@@ -1,5 +1,14 @@
 <?php
 /**
+ * FILE: admin/users.php
+ * WHAT IT DOES: Admin screen to create, edit, delete and reset passwords of
+ * staff and admin accounts. Passwords are validated (8+ characters, letters
+ * and numbers) and stored only as bcrypt hashes. Stops an admin deleting or
+ * demoting themselves or the last admin.
+ *
+ * FIND: manage users, create user, staff accounts, password hashing,
+ *       reset password
+ *
  * User account management (administrator).
  *
  * Closes the gap where staff accounts could only be created by editing
@@ -12,7 +21,11 @@ require_once __DIR__ . '/../includes/pagination.php';
 
 $user = require_role('admin');
 
-/** A password acceptable for a staff account (NFR-07). */
+/**
+ * PASSWORD RULES (NFR-07): at least 8 characters, with letters and numbers.
+ * Returns an error message, or null if the password is acceptable.
+ * FIND: password rules, password strength, password policy
+ */
 function password_problem(string $pw): ?string
 {
     if (strlen($pw) < 8) {
@@ -64,6 +77,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check($_POST['csrf'] ?? null))
                 flash('You cannot remove your own administrator role.', 'error');
             } else {
                 if ($pw !== '') {
+                    // Admin reset: new password stored as a bcrypt hash.
+                    // FIND: reset password, password hashing
                     q('UPDATE user SET full_name = :n, email = :e, phone_number = :p,
                               role = :r, password_hash = :h WHERE user_id = :id',
                       [':n' => $name, ':e' => $email, ':p' => $phone, ':r' => $role,
@@ -78,6 +93,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_check($_POST['csrf'] ?? null))
                 }
             }
         } else {
+            // NEW ACCOUNT - PASSWORD HASHING: password_hash() with
+            // PASSWORD_DEFAULT (bcrypt, random salt built in). The plain
+            // password is never saved. Checked at login by password_verify()
+            // in includes/auth.php.
+            // FIND: password hashing, hash password, bcrypt, create user
             q('INSERT INTO user (full_name, phone_number, email, password_hash, role)
                VALUES (:n, :p, :e, :h, :r)',
               [':n' => $name, ':p' => $phone, ':e' => $email,

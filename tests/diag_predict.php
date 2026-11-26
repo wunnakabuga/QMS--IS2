@@ -1,5 +1,10 @@
 <?php
 /**
+ * FILE: tests/diag_predict.php
+ * WHAT IT DOES: Troubleshooting script that shows why the PHP-to-Python
+ * prediction call might fail and fall back.
+ * FIND: prediction diagnostic, debug model
+ *
  * Temporary diagnostic: why does model_predict() fall back?
  *
  * Replicates modules/prediction.php::model_predict() exactly, except that

@@ -1,6 +1,15 @@
 <?php
 /**
+ * FILE: modules/prediction.php
  * Process 2.0 — Waiting Time Prediction Module
+ *
+ * WHAT IT DOES: Works out each waiting client's predicted waiting time using
+ * the trained Random Forest machine learning model (via ml/predict.py), and
+ * falls back to a simple queueing formula if the model cannot be reached.
+ * Runs again on every queue event so predictions stay current.
+ *
+ * FIND: prediction, machine learning, random forest, predicted waiting time,
+ *       features, fallback, how waiting time is calculated
  *
  * Implements FR-04, FR-05 and FR-06 and the design set out in Chapter 4,
  * Section 4.6. Five predictor features are assembled from live queue state
@@ -11,7 +20,10 @@
  */
 require_once __DIR__ . '/../includes/db.php';
 
-/** Number of counters currently open for a service type. */
+/**
+ * Count the counters currently open for a service.
+ * FIND: open counters
+ */
 function open_counter_count(string $serviceType): int
 {
     return (int)q_val(
@@ -23,8 +35,12 @@ function open_counter_count(string $serviceType): int
 }
 
 /**
- * Assemble the shared (queue-level) predictor features for a service type.
- * Per-entry queue_length is added later, because it differs by position.
+ * MODEL INPUT FEATURES. Build the predictor values the model needs from live
+ * data: arrival rate (joins in the last hour), average service time (last 14
+ * days), service rate, time of day and open counters. queue_length is added
+ * per client later because it depends on their position.
+ * FIND: features, predictor variables, model inputs, arrival rate,
+ *       service rate, average service time
  */
 function queue_features(string $serviceType): array
 {
@@ -67,8 +83,9 @@ function queue_features(string $serviceType): array
 }
 
 /**
- * Deterministic queueing-theory fallback (FR-06).
- * Expected wait = (entries ahead x mean service time) / open counters.
+ * FALLBACK FORMULA (FR-06), used when the ML model is unavailable.
+ * Expected wait = (people ahead x average service time) / open counters.
+ * FIND: fallback, queueing formula, backup estimate
  */
 function fallback_estimate(int $ahead, float $avgServiceTime, int $counters): float
 {
@@ -77,8 +94,11 @@ function fallback_estimate(int $ahead, float $avgServiceTime, int $counters): fl
 }
 
 /**
- * Invoke the trained Random Forest model for a batch of feature rows.
- * Returns an array of predictions, or null when the model is unreachable.
+ * CALL THE ML MODEL. Sends the feature rows as JSON to ml/predict.py (Python)
+ * and reads back one predicted wait per row. Gives up after
+ * PREDICTION_TIMEOUT seconds. Returns null if Python or the model file is
+ * missing or the answer is invalid, so the caller can use the fallback.
+ * FIND: call model, python, random forest, run prediction, PHP to Python
  */
 function model_predict(array $rows): ?array
 {
@@ -118,8 +138,11 @@ function model_predict(array $rows): ?array
 }
 
 /**
- * Recalculate predicted waiting times for every outstanding entry of a
- * service type. Called on every queue event (FR-05).
+ * RECALCULATE PREDICTIONS (FR-05). For every client still waiting for a
+ * service, build their features, ask the model (or fallback) for a waiting
+ * time, and save it with its source ("model" or "fallback"). Called on every
+ * queue event: join, call, complete, cancel, counter opened/closed.
+ * FIND: recalculate predictions, update waiting time, dynamic prediction
  *
  * @return array{updated:int, source:string}
  */
@@ -182,7 +205,7 @@ function recalculate_predictions(string $serviceType): array
     return ['updated' => count($entries), 'source' => $source];
 }
 
-/** Recalculate every service type at once. */
+/** Recalculate predictions for every service that has people waiting. */
 function recalculate_all_predictions(): array
 {
     $types = q_all('SELECT DISTINCT service_type FROM queue_entry
@@ -194,7 +217,11 @@ function recalculate_all_predictions(): array
     return $result;
 }
 
-/** Derived attribute: 1-based position of an entry within its queue. */
+/**
+ * A client's position in their queue (1 = next), counted from everyone
+ * who joined the same service earlier and is still waiting.
+ * FIND: queue position, position in line, people ahead
+ */
 function queue_position(int $queueEntryId): ?int
 {
     $entry = q_one(

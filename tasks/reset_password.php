@@ -1,5 +1,11 @@
 <?php
 /**
+ * FILE: tasks/reset_password.php
+ * WHAT IT DOES: Command-line tool to reset a staff/admin password (hashed
+ * with password_hash) when nobody can log in. Not reachable from the web.
+ *
+ * FIND: emergency password reset, command line reset, locked out
+ *
  * Password reset and account diagnostic (command line).
  *
  * Account passwords are normally changed from the administrator's User

@@ -1,5 +1,13 @@
 <?php
-/** Service counter console — Wireframe 7. Implements FR-14 to FR-16. */
+/**
+ * FILE: staff/counter.php
+ * WHAT IT DOES: The staff counter console (Wireframe 7, FR-14 to FR-16).
+ * Buttons to call next, start, complete, mark no-show, open/close the
+ * counter, and take an overflow client from a busier queue. The waiting
+ * list refreshes live via api/counter_status.php.
+ *
+ * FIND: counter console, staff screen, call next button
+ */
 define('QMS_ROOT', '../');
 require_once __DIR__ . '/../includes/layout.php';
 require_once __DIR__ . '/../modules/service_delivery.php';

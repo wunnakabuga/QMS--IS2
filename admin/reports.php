@@ -1,5 +1,12 @@
 <?php
-/** Reports and analytics — Wireframe 10. Implements FR-18 and FR-19. */
+/**
+ * FILE: admin/reports.php
+ * WHAT IT DOES: Reports page (Wireframe 10, FR-18, FR-19). Filter by date,
+ * service and counter; shows accuracy (MAE/MSE/RMSE), charts, heat map and
+ * the service log; can download everything as CSV or print it.
+ *
+ * FIND: reports page, CSV export, print report
+ */
 define('QMS_ROOT', '../');
 require_once __DIR__ . '/../includes/layout.php';
 require_once __DIR__ . '/../includes/pagination.php';
@@ -26,6 +33,7 @@ function csv_row($handle, array $fields): void
 $f = report_filters($_GET);
 
 // ------------------------------------------------------------ CSV export
+// FIND: CSV export, download report
 if (($_GET['export'] ?? '') === 'csv') {
     // A downloaded file must contain nothing but the file. With display_errors
     // on for development, a stray notice would otherwise be written into the

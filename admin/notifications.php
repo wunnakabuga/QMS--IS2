@@ -1,5 +1,11 @@
 <?php
 /**
+ * FILE: admin/notifications.php
+ * WHAT IT DOES: Log of every ticket and reminder message sent - channel
+ * (SMS or e-ticket) and delivery status - with filters and paging.
+ *
+ * FIND: notifications log, SMS log, delivery status
+ *
  * Notifications log (administrator).
  *
  * Surfaces the NOTIFICATION table so that dispatch can be audited: which

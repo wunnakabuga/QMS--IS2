@@ -1,6 +1,14 @@
 <?php
 /**
+ * FILE: modules/service_delivery.php
  * Process 4.0 — Service Delivery Management Module
+ *
+ * WHAT IT DOES: The logic behind the staff counter screen - call next
+ * client, start service, complete service (recording how long it took),
+ * mark no-shows, and expire tickets whose grace period has run out.
+ *
+ * FIND: call next client, start service, complete service, no show,
+ *       expire ticket, grace period, service duration, counter statistics
  *
  * Implements FR-12, FR-14, FR-15 and FR-16. Drives the counter console:
  * calling the next client, starting and completing service, flagging
@@ -9,7 +17,10 @@
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/prediction.php';
 
-/** The counter a staff member is assigned to. */
+/**
+ * Find the counter assigned to a staff member.
+ * FIND: staff counter, assigned counter
+ */
 function staff_counter(int $staffUserId): ?array
 {
     return q_one(
@@ -18,7 +29,11 @@ function staff_counter(int $staffUserId): ?array
     );
 }
 
-/** FR-12: expire tickets called more than the grace period ago. */
+/**
+ * EXPIRE TICKETS (FR-12). Marks clients as expired if they were called more
+ * than GRACE_PERIOD_MINUTES ago and never came to the counter.
+ * FIND: expire ticket, grace period, timeout
+ */
 function expire_lapsed_tickets(): int
 {
     $lapsed = q_all(
@@ -39,7 +54,7 @@ function expire_lapsed_tickets(): int
     return count($lapsed);
 }
 
-/** The entry currently occupying a counter, if any. */
+/** The client currently being served or called at a counter, if any. */
 function current_at_counter(int $counterId): ?array
 {
     return q_one(
@@ -51,7 +66,7 @@ function current_at_counter(int $counterId): ?array
     );
 }
 
-/** The next entries waiting for a counter's service type. */
+/** The next clients waiting for this counter's service, in order. */
 function upcoming_for_counter(int $counterId, int $limit = 8): array
 {
     $counter = q_one('SELECT service_type FROM service_counter WHERE counter_id = :c',
@@ -73,7 +88,13 @@ function upcoming_for_counter(int $counterId, int $limit = 8): array
     return $rows;
 }
 
-/** FR-14: call the next eligible client to a counter. */
+/**
+ * CALL NEXT CLIENT (FR-14). Calls the client who has waited longest
+ * (first come, first served) to this counter. If the counter's own queue is
+ * empty and automatic load balancing is on, it takes a client from a busier
+ * service instead.
+ * FIND: call next, next client, first come first served, FIFO
+ */
 function call_next(int $counterId): array
 {
     expire_lapsed_tickets();
@@ -138,7 +159,10 @@ function call_next(int $counterId): array
     return ['ok' => true, 'entry_id' => $entryId];
 }
 
-/** FR-14: mark the called client as in service. */
+/**
+ * Mark the called client as now being served (records service start time).
+ * FIND: start service
+ */
 function start_service(int $queueEntryId): array
 {
     $entry = q_one('SELECT status, counter_id FROM queue_entry
@@ -154,7 +178,12 @@ function start_service(int $queueEntryId): array
     return ['ok' => true];
 }
 
-/** FR-15: complete the service and write the service log with its duration. */
+/**
+ * COMPLETE SERVICE (FR-15). Marks the client as done and saves how long the
+ * service took in the service log. These durations feed the average service
+ * time used by the prediction model.
+ * FIND: complete service, finish service, service duration, service log
+ */
 function complete_service(int $queueEntryId): array
 {
     $entry = q_one('SELECT status, counter_id, service_type, service_start_time
@@ -189,7 +218,10 @@ function complete_service(int $queueEntryId): array
     return ['ok' => true, 'duration_seconds' => $duration];
 }
 
-/** FR-16: flag a called client who failed to present. */
+/**
+ * NO-SHOW (FR-16). Flags a called client who never came to the counter.
+ * FIND: no show, did not attend
+ */
 function mark_no_show(int $queueEntryId): array
 {
     $entry = q_one('SELECT status, counter_id, service_type FROM queue_entry
@@ -206,7 +238,10 @@ function mark_no_show(int $queueEntryId): array
     return ['ok' => true];
 }
 
-/** Counter-level statistics for the console header. */
+/**
+ * Today's figures for one counter (served, average time, waiting).
+ * FIND: counter statistics
+ */
 function counter_stats(int $counterId): array
 {
     $counter = q_one('SELECT service_type FROM service_counter WHERE counter_id = :c',

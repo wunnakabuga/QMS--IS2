@@ -1,6 +1,12 @@
 <?php
 /**
+ * FILE: modules/load_balancing.php
  * Process 5.0 — Counter Load Balancing Module
+ *
+ * WHAT IT DOES (short version): lets an idle counter serve a client from a
+ * busier service's queue ("overflow"), and measures how much that helps.
+ *
+ * FIND: load balancing, overflow, idle counter, congestion, busy queue
  *
  * Implements FR-21 and FR-22. Public service centres allocate counters to
  * service types in advance, which means a counter can sit idle while a
@@ -45,7 +51,10 @@ function overflow_min_waiting(): int
     return max(1, (int)setting_get('overflow_min_waiting', '2'));
 }
 
-/** Master switch for the whole mechanism. */
+/**
+ * Is load balancing switched on? (Admin setting.)
+ * FIND: enable load balancing
+ */
 function overflow_is_enabled(): bool
 {
     return (string)setting_get('overflow_enabled', '1') === '1';
@@ -58,6 +67,8 @@ function overflow_is_automatic(): bool
 }
 
 /**
+ * CONGESTION SNAPSHOT. People waiting per open counter for every service.
+ * FIND: queue load, congestion, load per counter
  * Load on every service type that currently has either a queue or an open
  * counter, most congested first.
  *
@@ -138,6 +149,7 @@ function service_load_snapshot(): array
 }
 
 /**
+ * FIND: idle counter
  * True when a counter is open, has no client in front of it, and has
  * nobody waiting for its own service type. This is the only state in
  * which overflow applies.
@@ -211,6 +223,9 @@ function overflow_recommendation(int $counterId): ?array
 }
 
 /**
+ * OVERFLOW CALL. An idle counter takes the longest-waiting client from a
+ * congested service.
+ * FIND: call overflow, borrow client, serve other queue
  * FR-22: call the longest-waiting client of another service type to an
  * idle counter.
  *
@@ -312,6 +327,7 @@ function call_next_overflow(int $counterId, string $serviceType): array
 }
 
 /**
+ * FIND: load balancing statistics, overflow efficiency
  * Efficiency produced by load balancing over a date range.
  *
  * The honest comparison is between overflow-served clients and clients of

@@ -1,5 +1,12 @@
 <?php
 /**
+ * FILE: tests/smoke_test.php
+ * WHAT IT DOES: The automated test suite. Runs the whole queue lifecycle
+ * (join -> predict -> dispatch -> serve -> report) plus security checks
+ * (password hashing, rate limiting) and prints PASS/FAIL for each.
+ *
+ * FIND: tests, test suite, automated testing, unit tests
+ *
  * Unit / integration smoke test for the queue lifecycle.
  *
  * Exercises the modules directly (not through HTTP) so that each process

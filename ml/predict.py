@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
 """
+FILE: ml/predict.py
+WHAT IT DOES: Called by PHP (modules/prediction.php) on every queue event.
+Reads the features as JSON, runs them through the trained Random Forest and
+prints the predicted waiting times as JSON.
+
+FIND: predict.py, PHP to Python, run model, prediction script
+
 Prediction bridge between the PHP application and the trained model.
 
 Reads a JSON object on stdin:
@@ -96,6 +103,7 @@ def predict_reference(rows):
 
 
 def main() -> int:
+    """Read rows from stdin, predict, and print the JSON result."""
     try:
         payload = json.load(sys.stdin)
         rows = payload.get("rows") or []

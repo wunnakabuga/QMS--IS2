@@ -1,5 +1,13 @@
 <?php
-/** Staff and administrator login — Wireframe 6. Implements FR-20. */
+/**
+ * FILE: login.php
+ * WHAT IT DOES: Staff and administrator sign-in page (Wireframe 6, FR-20).
+ * Checks the CSRF token, then calls auth_attempt() in includes/auth.php,
+ * which verifies the password against its bcrypt hash. Admins go to the
+ * dashboard, staff to their counter.
+ *
+ * FIND: login page, sign in, staff login
+ */
 define('QMS_ROOT', './');
 require_once __DIR__ . '/includes/layout.php';
 
@@ -17,6 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_check($_POST['csrf'] ?? null)) {
         $error = 'Your session expired. Please sign in again.';
     } else {
+        // Password is checked with password_verify() inside auth_attempt().
+        // FIND: login check
         $user = auth_attempt($email, $password);
         if ($user) {
             redirect($user['role'] === 'admin' ? 'admin/dashboard.php' : 'staff/counter.php');

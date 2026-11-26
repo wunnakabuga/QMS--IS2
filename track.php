@@ -1,5 +1,12 @@
 <?php
-/** Live queue tracking — Wireframe 4. Implements FR-13. */
+/**
+ * FILE: track.php
+ * WHAT IT DOES: "Track ticket" (Wireframe 4, FR-13). The client types a
+ * ticket number or phone number and sees their position, predicted wait
+ * and the queue for their service.
+ *
+ * FIND: track ticket, track queue, search by phone
+ */
 define('QMS_ROOT', './');
 require_once __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/modules/queue_registration.php';
