@@ -26,6 +26,21 @@ if (!defined('OTP_TTL_SECONDS')) {
 if (!defined('OTP_MAX_ATTEMPTS')) {
     define('OTP_MAX_ATTEMPTS', 5);
 }
+// Google sign-in defaults: off unless a client ID and secret are supplied
+// (in config.php or the QMS_GOOGLE_* environment variables).
+if (!defined('GOOGLE_CLIENT_ID')) {
+    define('GOOGLE_CLIENT_ID', getenv('QMS_GOOGLE_ID') ?: '');
+}
+if (!defined('GOOGLE_CLIENT_SECRET')) {
+    define('GOOGLE_CLIENT_SECRET', getenv('QMS_GOOGLE_SECRET') ?: '');
+}
+if (!defined('GOOGLE_REDIRECT_URI')) {
+    define('GOOGLE_REDIRECT_URI', getenv('QMS_GOOGLE_REDIRECT')
+        ?: 'http://localhost/qms/auth/google_callback.php');
+}
+if (!defined('GOOGLE_OAUTH_ENABLED')) {
+    define('GOOGLE_OAUTH_ENABLED', GOOGLE_CLIENT_ID !== '' && GOOGLE_CLIENT_SECRET !== '');
+}
 
 /**
  * Start the PHP session if one is not already running (skipped on the

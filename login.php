@@ -4,11 +4,12 @@
  * WHAT IT DOES: Staff and administrator sign-in page (Wireframe 6, FR-20).
  * Step 1: email + password, checked against the bcrypt hash by
  * auth_verify_credentials() in includes/auth.php. Step 2 (when
- * TWOFA_ENABLED): a one-time 6-digit code sent by SMS. Admins go to the
- * dashboard, staff to their counter. Has a "Forgot your password?" link to
- * forgot_password.php.
+ * TWOFA_ENABLED): a one-time 6-digit code sent by SMS. Alternatively
+ * "Sign in with Google" (auth/google_start.php) when Google is configured.
+ * Admins go to the dashboard, staff to their counter. Has a "Forgot your
+ * password?" link to forgot_password.php.
  *
- * FIND: login page, sign in, staff login, two-step verification
+ * FIND: login page, sign in, staff login, two-step verification, Google sign in
  */
 define('QMS_ROOT', './');
 require_once __DIR__ . '/includes/layout.php';
@@ -88,6 +89,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+if (!$error && isset($_GET['google'])) {
+    $g = $_GET['google'];
+    if ($g === 'unknown') {
+        $error = 'That Google account is not registered as staff. '
+               . 'Use your email and password, or ask an administrator to add it.';
+    } elseif ($g === 'failed') {
+        $error = 'Google sign-in did not complete. Please try again.';
+    } elseif ($g === 'unavailable') {
+        $notice = 'Google sign-in is not configured on this server.';
+    }
+}
+
 $simCode = $_SESSION['otp_sim'] ?? null;
 
 page_head('Staff sign in', 'login', ['narrow' => true]);
@@ -151,6 +164,10 @@ page_head('Staff sign in', 'login', ['narrow' => true]);
           console, administrators the dashboard.
         <?php endif; ?>
       </p>
+      <?php if (GOOGLE_OAUTH_ENABLED): ?>
+        <div style="text-align:center; margin:16px 0 10px; color:#9a938e; font-size:13px;">or</div>
+        <a class="btn ghost block" href="auth/google_start.php" style="text-align:center;">Sign in with Google</a>
+      <?php endif; ?>
     <?php endif; ?>
   </div>
 </div>
